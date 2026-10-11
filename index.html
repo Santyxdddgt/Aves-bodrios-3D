@@ -1,0 +1,3889 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BOMB: FRUIT NIGHT</title>
+  <style>
+    :root {
+      --purple-main: #a855f7;
+      --purple-bright: #d8b4fe;
+      --purple-deep: #3b0764;
+      --green-stem: #4ade80;
+      --amber-warn: #f59e0b;
+      --red-danger: #ef4444;
+      --bg-dark: rgba(10, 6, 20, 0.86);
+      --border-glow: rgba(168, 85, 247, 0.45);
+      --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #06030d;
+      color: #f3e8ff;
+      font-family: var(--font-sans);
+    }
+
+    #game-viewport {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+    }
+
+    /* HUD SUPERIOR */
+    #hud {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    .hud-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    /* Indicador recordado del sueño: color violeta, símbolo de fruta y tipografía sans serif */
+    #fruit-progress-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: linear-gradient(135deg, rgba(76, 29, 149, 0.92), rgba(30, 10, 60, 0.92));
+      border: 2px solid var(--purple-main);
+      box-shadow: 0 0 18px rgba(168, 85, 247, 0.45);
+      border-radius: 999px;
+      padding: 8px 16px;
+      font-family: var(--font-sans);
+      font-weight: 800;
+      color: #f5d0fe;
+      font-size: 1.15rem;
+      letter-spacing: 0.02em;
+    }
+
+    #fruit-icon-svg {
+      width: 26px;
+      height: 26px;
+      flex-shrink: 0;
+      filter: drop-shadow(0 0 6px #c084fc);
+    }
+
+    #fruit-count-detail {
+      font-size: 0.82rem;
+      color: #d8b4fe;
+      font-weight: 600;
+      margin-left: 4px;
+    }
+
+    /* Medidor de ruido visible (decisión solicitada por el usuario) */
+    #noise-meter-card {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-glow);
+      border-radius: 12px;
+      padding: 8px 12px;
+      min-width: 220px;
+      backdrop-filter: blur(6px);
+    }
+
+    .noise-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+      color: #e9d5ff;
+    }
+
+    .noise-bar-track {
+      position: relative;
+      width: 100%;
+      height: 11px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    #noise-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #4ade80 0%, #facc15 65%, #ef4444 100%);
+      border-radius: 999px;
+      transition: width 0.06s linear;
+    }
+
+    #noise-threshold-marker {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 80%;
+      width: 2px;
+      background: #ffffff;
+      opacity: 0.85;
+    }
+
+    #noise-status-text {
+      margin-top: 4px;
+      font-size: 0.73rem;
+      color: #cbd5e1;
+    }
+
+    /* Estado de fase (Noche / Día) y botones rápidos */
+    .hud-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    #phase-badge {
+      padding: 7px 13px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      background: rgba(30, 27, 75, 0.9);
+      border: 1px solid #818cf8;
+      color: #e0e7ff;
+    }
+
+    #phase-badge.day-alert {
+      background: rgba(153, 27, 27, 0.92);
+      border-color: #f87171;
+      color: #fef2f2;
+      animation: pulse-alert 0.7s infinite alternate;
+    }
+
+    @keyframes pulse-alert {
+      from { transform: scale(1); box-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
+      to { transform: scale(1.05); box-shadow: 0 0 18px rgba(239, 68, 68, 0.95); }
+    }
+
+    .hud-btn {
+      background: var(--bg-dark);
+      color: #f3e8ff;
+      border: 1px solid var(--border-glow);
+      border-radius: 10px;
+      padding: 7px 11px;
+      font-family: var(--font-sans);
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .hud-btn:hover, .hud-btn:focus-visible {
+      border-color: #d8b4fe;
+      background: rgba(59, 7, 100, 0.85);
+    }
+
+    /* Mensajes contextuales / Objetivos */
+    #objective-banner {
+      position: absolute;
+      top: 96px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 8, 30, 0.84);
+      border: 1px solid rgba(192, 132, 252, 0.45);
+      border-radius: 999px;
+      padding: 6px 16px;
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: #f3e8ff;
+      pointer-events: none;
+      z-index: 18;
+      text-align: center;
+      max-width: 92vw;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* CONTROLES TÁCTILES (MÓVIL PRIMERO + ADAPTABLES) */
+    #touch-controls {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 0 16px;
+      pointer-events: none;
+      z-index: 22;
+    }
+
+    #joystick-zone {
+      position: relative;
+      width: 124px;
+      height: 124px;
+      border-radius: 50%;
+      background: rgba(20, 12, 38, 0.58);
+      border: 2px solid rgba(168, 85, 247, 0.55);
+      pointer-events: auto;
+      touch-action: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #joystick-knob {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #d8b4fe, #7e22ce);
+      border: 2px solid #f3e8ff;
+      box-shadow: 0 0 12px rgba(168, 85, 247, 0.7);
+      transform: translate(0px, 0px);
+      pointer-events: none;
+    }
+
+    #action-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, 68px);
+      grid-gap: 10px;
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    .touch-btn {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      border: 2px solid rgba(216, 180, 254, 0.7);
+      background: rgba(28, 12, 54, 0.78);
+      color: #faf5ff;
+      font-family: var(--font-sans);
+      font-size: 0.72rem;
+      font-weight: 800;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+      cursor: pointer;
+      touch-action: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    }
+
+    .touch-btn.active {
+      background: rgba(147, 51, 234, 0.92);
+      transform: scale(0.95);
+      border-color: #ffffff;
+    }
+
+    .touch-btn span.key-hint {
+      font-size: 0.62rem;
+      color: #c4b5fd;
+      font-weight: 600;
+    }
+
+    /* MODALES Y PANTALLAS DE ESTADO */
+    .overlay-screen {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, rgba(24, 10, 48, 0.88), rgba(5, 2, 12, 0.95));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      z-index: 40;
+      overflow-y: auto;
+      touch-action: pan-y;
+    }
+
+    .overlay-screen.hidden {
+      display: none !important;
+    }
+
+    .modal-card {
+      background: rgba(15, 9, 30, 0.95);
+      border: 1px solid rgba(168, 85, 247, 0.6);
+      box-shadow: 0 0 36px rgba(126, 34, 206, 0.45);
+      border-radius: 18px;
+      max-width: 620px;
+      width: 100%;
+      padding: 22px 24px;
+      color: #f3e8ff;
+      max-height: 92vh;
+      overflow-y: auto;
+    }
+
+    .modal-title {
+      margin: 0 0 6px 0;
+      font-size: 1.75rem;
+      font-weight: 900;
+      letter-spacing: 0.03em;
+      color: #e9d5ff;
+      text-shadow: 0 0 14px rgba(168, 85, 247, 0.7);
+    }
+
+    .modal-subtitle {
+      margin: 0 0 14px 0;
+      font-size: 0.92rem;
+      color: #c4b5fd;
+      line-height: 1.45;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .info-box {
+      background: rgba(34, 17, 64, 0.65);
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 0.82rem;
+      line-height: 1.4;
+    }
+
+    .info-box h3 {
+      margin: 0 0 6px 0;
+      font-size: 0.86rem;
+      color: #d8b4fe;
+    }
+
+    .asset-status-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(10, 5, 20, 0.75);
+      border: 1px solid rgba(168, 85, 247, 0.35);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      font-size: 0.8rem;
+    }
+
+    .status-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge-ok { color: #4ade80; font-weight: 700; }
+    .badge-warn { color: #facc15; font-weight: 700; }
+    .badge-err { color: #f87171; font-weight: 700; }
+
+    .local-glb-controls {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed rgba(168, 85, 247, 0.25);
+    }
+
+    .file-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: rgba(76, 29, 149, 0.5);
+      border: 1px solid rgba(192, 132, 252, 0.5);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      color: #e9d5ff;
+    }
+
+    .file-label input[type="file"] {
+      display: none;
+    }
+
+    .btn-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .primary-btn {
+      background: linear-gradient(135deg, #9333ea, #6b21a8);
+      color: #ffffff;
+      border: 1px solid #d8b4fe;
+      border-radius: 12px;
+      padding: 11px 20px;
+      font-family: var(--font-sans);
+      font-size: 0.96rem;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 0 18px rgba(147, 51, 234, 0.55);
+    }
+
+    .primary-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .secondary-btn {
+      background: rgba(38, 20, 70, 0.85);
+      color: #e9d5ff;
+      border: 1px solid rgba(168, 85, 247, 0.5);
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-family: var(--font-sans);
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    #diag-pre {
+      background: #05020a;
+      border: 1px solid rgba(168, 85, 247, 0.4);
+      border-radius: 10px;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 0.74rem;
+      color: #d8b4fe;
+      max-height: 260px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    @media (max-width: 640px) {
+      #fruit-progress-pill {
+        font-size: 1rem;
+        padding: 6px 12px;
+      }
+      #noise-meter-card {
+        min-width: 165px;
+        padding: 6px 10px;
+      }
+      #joystick-zone {
+        width: 106px;
+        height: 106px;
+      }
+      .touch-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 0.68rem;
+      }
+      #action-buttons {
+        grid-template-columns: repeat(2, 60px);
+        grid-gap: 8px;
+      }
+    }
+  </style>
+
+  <!-- 17. PRIMER SCRIPT CLÁSICO INLINE: CAPTURADOR DE RUNTIME Y BARRERAS DE ARRANQUE -->
+  <script>
+    (function installBombRuntimeDiagnostics() {
+      var MAX_LOGS = 80;
+      var errors = [];
+      var resourceFailures = [];
+      var bootBarriers = {
+        runtimeCapturerInstalled: true,
+        threeLoaded: false,
+        rendererInitialized: false,
+        sceneAndCameraReady: false,
+        systemsBuilt: false,
+        initialStateCoherent: false,
+        modelsResolved: false
+      };
+
+      var diag = {
+        installedAt: new Date().toISOString(),
+        gameState: 'LOADING',
+        threeRevision: null,
+        rendererStatus: 'PENDING',
+        bootBarriers: bootBarriers,
+        models: {
+          bomb: {
+            status: 'PENDING',
+            source: 'NONE',
+            url: 'https://raw.githubusercontent.com/Santyxdddgt/Aves-bodrios-3D/e9129ced5107a05541c7aa53542dce3a9bca9b23/bomb_angry_birds_movie.glb',
+            meshes: 0,
+            skinnedMeshes: 0,
+            bones: 0,
+            nativeClips: 0,
+            proceduralClips: [],
+            error: null
+          },
+          ross: {
+            status: 'PENDING',
+            source: 'NONE',
+            url: 'https://raw.githubusercontent.com/Santyxdddgt/Aves-bodrios-3D/e9129ced5107a05541c7aa53542dce3a9bca9b23/ross_angry_birds_movie.glb',
+            meshes: 0,
+            skinnedMeshes: 0,
+            bones: 0,
+            nativeClips: 0,
+            proceduralClips: [],
+            error: null
+          }
+        },
+        live: {
+          totalFruits: 0,
+          collectedFruits: 0,
+          percentage: 0,
+          noiseLevel: 0,
+          isDay: false,
+          dayBlend: 0,
+          seedPlanted: false,
+          plantGrown: false,
+          playerState: 'Idle',
+          enemyState: 'SLEEPING',
+          tintNight: null,
+          activeChasers: 0,
+          fps: 0
+        },
+        errors: errors,
+        resourceFailures: resourceFailures,
+        runtime: {
+          rendererInfo: null,
+          limbSummary: null
+        },
+        recordError: function (entry) {
+          var item = {
+            type: entry.type || 'error',
+            message: String(entry.message || 'Error desconocido'),
+            source: entry.source || null,
+            line: typeof entry.line === 'number' ? entry.line : null,
+            column: typeof entry.column === 'number' ? entry.column : null,
+            severity: entry.severity || 'error',
+            gameState: diag.gameState,
+            timestamp: new Date().toISOString()
+          };
+          errors.push(item);
+          if (errors.length > MAX_LOGS) errors.shift();
+          if (item.severity === 'fatal') {
+            diag.showFatalPanel(item.message);
+          }
+          return item;
+        },
+        recordResourceFailure: function (info) {
+          var item = {
+            url: info.url || 'unknown',
+            tag: info.tag || 'resource',
+            reason: info.reason || 'Load failed',
+            gameState: diag.gameState,
+            timestamp: new Date().toISOString()
+          };
+          resourceFailures.push(item);
+          if (resourceFailures.length > MAX_LOGS) resourceFailures.shift();
+          return item;
+        },
+        showFatalPanel: function (reason) {
+          diag.gameState = 'ERROR';
+          var errScreen = document.getElementById('error-screen');
+          var errMsg = document.getElementById('error-message-detail');
+          if (errMsg) errMsg.textContent = String(reason || 'Fallo crítico de inicialización.');
+          if (errScreen) errScreen.classList.remove('hidden');
+        },
+        getSnapshot: function () {
+          return JSON.parse(JSON.stringify({
+            gameState: diag.gameState,
+            threeRevision: diag.threeRevision,
+            rendererStatus: diag.rendererStatus,
+            bootBarriers: diag.bootBarriers,
+            models: diag.models,
+            live: diag.live,
+            errorsCount: errors.length,
+            errors: errors.slice(-15),
+            resourceFailures: resourceFailures.slice(-15)
+          }));
+        }
+      };
+
+      window.__BOMB_DIAGNOSTICS__ = diag;
+
+      window.addEventListener('error', function (ev) {
+        if (ev && ev.target && ev.target !== window && (ev.target.src || ev.target.href)) {
+          diag.recordResourceFailure({
+            url: ev.target.src || ev.target.href,
+            tag: ev.target.tagName || 'ELEMENT',
+            reason: 'Error de carga de etiqueta de recurso'
+          });
+          return;
+        }
+        diag.recordError({
+          type: 'window.error',
+          message: ev && ev.message ? ev.message : 'Error de ejecución',
+          source: ev && ev.filename ? ev.filename : null,
+          line: ev && typeof ev.lineno === 'number' ? ev.lineno : null,
+          column: ev && typeof ev.colno === 'number' ? ev.colno : null,
+          severity: 'error'
+        });
+      }, true);
+
+      window.addEventListener('unhandledrejection', function (ev) {
+        var reason = ev && ev.reason ? (ev.reason.stack || ev.reason.message || String(ev.reason)) : 'Promesa rechazada';
+        diag.recordError({
+          type: 'unhandledrejection',
+          message: reason,
+          severity: 'error'
+        });
+      });
+    })();
+  </script>
+
+  <!-- 3. IMPORT MAP OFICIAL THREE.JS 0.186.1 -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="game-viewport">
+    <canvas id="game-canvas" tabindex="0" aria-label="Escena 3D de BOMB: FRUIT NIGHT"></canvas>
+
+    <!-- HUD -->
+    <div id="hud">
+      <div class="hud-group">
+        <!-- Indicador recordado: violeta, símbolo de fruta del dragón morada con tallo verde y sans-serif -->
+        <div id="fruit-progress-pill" aria-live="polite">
+          <svg id="fruit-icon-svg" viewBox="0 0 64 64" role="img" aria-label="Fruta del dragón morada">
+            <ellipse cx="32" cy="36" rx="20" ry="23" fill="#9333ea" stroke="#e9d5ff" stroke-width="3"/>
+            <path d="M16 28 Q10 22 18 20" fill="none" stroke="#c084fc" stroke-width="3" stroke-linecap="round"/>
+            <path d="M48 28 Q54 22 46 20" fill="none" stroke="#c084fc" stroke-width="3" stroke-linecap="round"/>
+            <path d="M14 42 Q8 38 16 35" fill="none" stroke="#c084fc" stroke-width="3" stroke-linecap="round"/>
+            <path d="M50 42 Q56 38 48 35" fill="none" stroke="#c084fc" stroke-width="3" stroke-linecap="round"/>
+            <ellipse cx="32" cy="38" rx="11" ry="13" fill="#a855f7" opacity="0.55"/>
+            <circle cx="28" cy="34" r="1.6" fill="#1e1b4b"/>
+            <circle cx="36" cy="35" r="1.6" fill="#1e1b4b"/>
+            <circle cx="32" cy="41" r="1.6" fill="#1e1b4b"/>
+            <circle cx="27" cy="43" r="1.5" fill="#1e1b4b"/>
+            <circle cx="37" cy="43" r="1.5" fill="#1e1b4b"/>
+            <!-- Tallo verde circular único -->
+            <circle cx="32" cy="11" r="6" fill="#4ade80" stroke="#166534" stroke-width="2"/>
+          </svg>
+          <span id="fruit-percentage-text">0 %</span>
+          <span id="fruit-count-detail">(0/12)</span>
+        </div>
+
+        <!-- Medidor de ruido visible -->
+        <div id="noise-meter-card">
+          <div class="noise-header">
+            <span>Nivel de Ruido</span>
+            <span id="noise-value-text">0 % · Silencio</span>
+          </div>
+          <div class="noise-bar-track">
+            <div id="noise-bar-fill"></div>
+            <div id="noise-threshold-marker" title="Umbral de alerta diurna"></div>
+          </div>
+          <div id="noise-status-text">Saltar: bajo · Rodar: medio · Aspirar: muy alto</div>
+        </div>
+      </div>
+
+      <div class="hud-right">
+        <div id="phase-badge">NOCHE · SIGILO</div>
+        <button type="button" class="hud-btn" id="btn-mute" title="Silenciar / Activar sonido">Sonido: ON</button>
+        <button type="button" class="hud-btn" id="btn-open-diag" title="Ver panel de diagnóstico">Diagnóstico</button>
+        <button type="button" class="hud-btn" id="btn-pause" title="Pausar partida (P / Esc)">Pausa</button>
+      </div>
+    </div>
+
+    <div id="objective-banner">
+      Recoge las 12 frutas del dragón moradas alrededor del lago sin despertar a los guardias.
+    </div>
+
+    <!-- Controles táctiles para móvil y pantallas táctiles -->
+    <div id="touch-controls" role="group" aria-label="Controles táctiles">
+      <div id="joystick-zone" role="application" aria-label="Joystick de movimiento">
+        <div id="joystick-knob"></div>
+      </div>
+      <div id="action-buttons">
+        <button type="button" class="touch-btn" id="btn-touch-jump">
+          <span>SALTAR</span>
+          <span class="key-hint">[Espacio]</span>
+        </button>
+        <button type="button" class="touch-btn" id="btn-touch-roll">
+          <span>RODAR</span>
+          <span class="key-hint">[Shift]</span>
+        </button>
+        <button type="button" class="touch-btn" id="btn-touch-suck">
+          <span>ASPIRAR</span>
+          <span class="key-hint">[E / K]</span>
+        </button>
+        <button type="button" class="touch-btn" id="btn-touch-interact">
+          <span>SEMILLA</span>
+          <span class="key-hint">[F / L]</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- PANTALLA DE MENÚ INICIAL / CARGA -->
+    <div class="overlay-screen" id="menu-screen">
+      <div class="modal-card">
+        <h1 class="modal-title">BOMB: FRUIT NIGHT</h1>
+        <p class="modal-subtitle">
+          Recorre el gran circuito circular alrededor del agua central durante la noche, recoge todas las frutas del dragón moradas luminosas para saciar a Bomb al <strong>100 %</strong>, planta la semilla en el pote de la plataforma final y salta el vacío de regreso a la plataforma inicial.
+        </p>
+
+        <div class="asset-status-row" id="asset-status-box">
+          <div class="status-line">
+            <span>Estado del motor Three.js:</span>
+            <span id="status-three-text" class="badge-warn">Inicializando...</span>
+          </div>
+          <div class="status-line">
+            <span>Modelo Bomb (GLB):</span>
+            <span id="status-bomb-text" class="badge-warn">Cargando...</span>
+          </div>
+          <div class="status-line">
+            <span>Modelo Ross (GLB):</span>
+            <span id="status-ross-text" class="badge-warn">Cargando...</span>
+          </div>
+          <div class="local-glb-controls">
+            <label class="file-label">
+              <span>Cargar Bomb (.glb local)</span>
+              <input type="file" id="input-local-bomb" accept=".glb,.gltf">
+            </label>
+            <label class="file-label">
+              <span>Cargar Ross (.glb local)</span>
+              <input type="file" id="input-local-ross" accept=".glb,.gltf">
+            </label>
+          </div>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-box">
+            <h3>Controles (Escritorio y Móvil)</h3>
+            <div><strong>WASD / Flechas / Joystick:</strong> Mover a Bomb</div>
+            <div><strong>Espacio / Botón SALTAR:</strong> Salto sigiloso (ruido bajo)</div>
+            <div><strong>Shift / Botón RODAR:</strong> Rodar veloz (ruido medio)</div>
+            <div><strong>Mantener E o K / ASPIRAR:</strong> Succión a distancia (ruido muy alto)</div>
+            <div><strong>Contacto directo:</strong> Comer a mordiscos con jugo morado</div>
+            <div><strong>F o L / SEMILLA:</strong> Tomar/lanzar semilla en el pote final</div>
+            <div><strong>P o Escape:</strong> Pausar / Reanudar</div>
+          </div>
+          <div class="info-box">
+            <h3>Reglas del Sueño</h3>
+            <div>• Cada enemigo dormido custodia una fruta morada brillante con tallo verde.</div>
+            <div>• Si acumulas demasiado ruido, se hace de <strong>día</strong> y los enemigos despiertan en enjambre para perseguirte.</div>
+            <div>• Al volver la noche regresan a sus puestos.</div>
+            <div>• Con el <strong>100 %</strong> de frutas, planta la semilla en la plataforma final, sube la elevación y salta el vacío hasta el inicio.</div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button type="button" class="primary-btn" id="btn-start-game" disabled>Cargando recursos...</button>
+          <button type="button" class="secondary-btn" id="btn-menu-diag">Ver Diagnóstico</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANTALLA DE PAUSA -->
+    <div class="overlay-screen hidden" id="pause-screen">
+      <div class="modal-card">
+        <h2 class="modal-title">JUEGO EN PAUSA</h2>
+        <p class="modal-subtitle">La simulación física, el medidor de ruido, los enemigos y los mixers de animación están detenidos.</p>
+        <div class="btn-row">
+          <button type="button" class="primary-btn" id="btn-resume-game">Reanudar Partida</button>
+          <button type="button" class="secondary-btn" id="btn-restart-from-pause">Reiniciar Nivel</button>
+          <button type="button" class="secondary-btn" id="btn-pause-diag">Panel de Diagnóstico</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANTALLA DE VICTORIA -->
+    <div class="overlay-screen hidden" id="victory-screen">
+      <div class="modal-card">
+        <h2 class="modal-title">¡VICTORIA! BOMB ESTÁ 100 % SACIADO</h2>
+        <p class="modal-subtitle" id="victory-summary-text">
+          Has recolectado todas las frutas del dragón moradas, hiciste crecer la planta en la plataforma final y saltaste el vacío de regreso a la plataforma inicial.
+        </p>
+        <div class="btn-row">
+          <button type="button" class="primary-btn" id="btn-restart-victory">Jugar de Nuevo</button>
+          <button type="button" class="secondary-btn" id="btn-victory-diag">Ver Diagnóstico</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL DE DIAGNÓSTICO EN VIVO -->
+    <div class="overlay-screen hidden" id="diag-screen">
+      <div class="modal-card">
+        <h2 class="modal-title">DIAGNÓSTICO EN VIVO</h2>
+        <p class="modal-subtitle">Estado real de Three.js, modelos GLB, rigs, clips, frutas, ruido y barreras de arranque.</p>
+        <pre id="diag-pre">Cargando datos...</pre>
+        <div class="btn-row">
+          <button type="button" class="primary-btn" id="btn-close-diag">Cerrar Diagnóstico</button>
+          <button type="button" class="secondary-btn" id="btn-refresh-diag">Actualizar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANTALLA DE ERROR FATAL -->
+    <div class="overlay-screen hidden" id="error-screen">
+      <div class="modal-card">
+        <h2 class="modal-title badge-err">ERROR CRÍTICO DE INICIALIZACIÓN</h2>
+        <p class="modal-subtitle" id="error-message-detail">No se pudo inicializar el motor gráfico WebGL o una dependencia esencial.</p>
+        <div class="btn-row">
+          <button type="button" class="secondary-btn" id="btn-error-diag">Abrir Diagnóstico</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCRIPT PRINCIPAL MÓDULO ES -->
+  <script type="module">
+/* BEGIN BOMB_TESTABLE_CORE */
+export const GameConfig = Object.freeze({
+  totalFruits: 12,
+  maxDeltaTime: 0.05,
+  ring: {
+    innerRadius: 28,
+    outerRadius: 44,
+    midRadius: 36,
+    waterRadius: 27.6,
+    startAngle: 0,
+    endAngle: Math.PI * 1.82,
+    gapStartAngle: Math.PI * 1.84,
+    gapEndAngle: Math.PI * 1.98,
+    startPlatformRadius: 9.5,
+    finalPlatformRadius: 10.5,
+    elevationHeight: 3.4
+  },
+  player: {
+    walkSpeed: 11.5,
+    rollSpeed: 19.5,
+    acceleration: 38.0,
+    deceleration: 28.0,
+    gravity: 28.0,
+    jumpVelocity: 13.2,
+    radius: 1.15,
+    suckRange: 9.5,
+    suckConeCos: 0.35,
+    suckPullSpeed: 11.0,
+    eatContactDuration: 1.1,
+    staggerDuration: 0.55
+  },
+  noise: {
+    min: 0,
+    max: 100,
+    jumpAdd: 6.5,
+    rollRatePerSec: 18.0,
+    suckRatePerSec: 46.0,
+    eatContactAdd: 3.5,
+    walkRatePerSec: 2.0,
+    quietDecayPerSec: 16.0,
+    activeDecayPerSec: 4.0,
+    dayTriggerThreshold: 80,
+    dayTriggerSustainSec: 0.55,
+    dayDurationSec: 9.0
+  },
+  enemies: {
+    wakeDuration: 0.45,
+    chaseSpeed: 14.2,
+    returnSpeed: 11.5,
+    recoveryDuration: 0.6,
+    hitRadius: 1.65,
+    // Camuflaje nocturno de Ross: en vez del 0.14 original que lo convertía
+    // en una silueta casi negra e irreconocible, conservamos el ~42 % del
+    // color base. Aún se distingue como "dormido y oculto" pero no desaparece.
+    nightCamouflage: 0.42,
+    nightEmissiveFloor: 0.08
+  }
+});
+
+export const GameStates = Object.freeze({
+  LOADING: 'LOADING',
+  MENU: 'MENU',
+  PLAYING_NIGHT: 'PLAYING_NIGHT',
+  PLAYING_DAY: 'PLAYING_DAY',
+  PAUSED: 'PAUSED',
+  VICTORY: 'VICTORY',
+  ERROR: 'ERROR'
+});
+
+export const FruitStates = Object.freeze({
+  AVAILABLE: 'AVAILABLE',
+  SUCKING: 'SUCKING',
+  EATING: 'EATING',
+  COLLECTED: 'COLLECTED'
+});
+
+export const EnemyStates = Object.freeze({
+  SLEEPING: 'SLEEPING',
+  WAKING: 'WAKING',
+  SWARM_CHASE: 'SWARM_CHASE',
+  RETURNING: 'RETURNING',
+  SLEEP_RECOVERY: 'SLEEP_RECOVERY'
+});
+
+export const GameRules = {
+  clampDelta(dt, maxDt = GameConfig.maxDeltaTime) {
+    if (!Number.isFinite(dt) || dt <= 0) return 0;
+    return Math.min(dt, maxDt);
+  },
+
+  clampNoise(value) {
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(GameConfig.noise.min, Math.min(GameConfig.noise.max, value));
+  },
+
+  sanitizeVec3(vec, fallback = { x: 0, y: 0, z: 0 }) {
+    if (!vec || !Number.isFinite(vec.x) || !Number.isFinite(vec.y) || !Number.isFinite(vec.z)) {
+      return { x: fallback.x, y: fallback.y, z: fallback.z };
+    }
+    return { x: vec.x, y: vec.y, z: vec.z };
+  },
+
+  calculateFruitPercentage(collectedFruits, totalFruits) {
+    if (!Number.isFinite(totalFruits) || totalFruits <= 0) return 0;
+    const safeCollected = Math.max(0, Math.min(totalFruits, Number.isFinite(collectedFruits) ? collectedFruits : 0));
+    const percentage = totalFruits > 0 ? (safeCollected / totalFruits) * 100 : 0;
+    return Math.max(0, Math.min(100, percentage));
+  },
+
+  createFruitRecord(id, x = 0, y = 0, z = 0) {
+    return {
+      id,
+      state: FruitStates.AVAILABLE,
+      x: Number.isFinite(x) ? x : 0,
+      y: Number.isFinite(y) ? y : 0,
+      z: Number.isFinite(z) ? z : 0,
+      suckProgress: 0,
+      eatTimer: 0
+    };
+  },
+
+  beginSuckFruit(fruit) {
+    if (!fruit || fruit.state !== FruitStates.AVAILABLE) return false;
+    fruit.state = FruitStates.SUCKING;
+    return true;
+  },
+
+  abortSuckFruit(fruit) {
+    if (!fruit || fruit.state !== FruitStates.SUCKING) return false;
+    fruit.state = FruitStates.AVAILABLE;
+    fruit.suckProgress = 0;
+    return true;
+  },
+
+  beginEatContactFruit(fruit) {
+    if (!fruit || fruit.state !== FruitStates.AVAILABLE) return false;
+    fruit.state = FruitStates.EATING;
+    fruit.eatTimer = 0;
+    return true;
+  },
+
+  completeFruitCollection(fruit, progressState) {
+    if (!fruit || fruit.state === FruitStates.COLLECTED) {
+      return { collectedNow: false, collectedFruits: progressState ? progressState.collectedFruits : 0, percentage: progressState ? progressState.percentage : 0 };
+    }
+    if (fruit.state !== FruitStates.SUCKING && fruit.state !== FruitStates.EATING) {
+      return { collectedNow: false, collectedFruits: progressState ? progressState.collectedFruits : 0, percentage: progressState ? progressState.percentage : 0 };
+    }
+    fruit.state = FruitStates.COLLECTED;
+    if (progressState) {
+      const total = Math.max(0, progressState.totalFruits || GameConfig.totalFruits);
+      progressState.collectedFruits = Math.min(total, (progressState.collectedFruits || 0) + 1);
+      progressState.percentage = GameRules.calculateFruitPercentage(progressState.collectedFruits, total);
+      return {
+        collectedNow: true,
+        collectedFruits: progressState.collectedFruits,
+        percentage: progressState.percentage
+      };
+    }
+    return { collectedNow: true, collectedFruits: 1, percentage: 100 };
+  },
+
+  stepNoiseMeter(noiseState, actions, dt, config = GameConfig.noise) {
+    const safeDt = GameRules.clampDelta(dt);
+    if (safeDt === 0) return noiseState;
+
+    let level = GameRules.clampNoise(noiseState.level);
+    let sustain = Number.isFinite(noiseState.aboveThresholdTime) ? Math.max(0, noiseState.aboveThresholdTime) : 0;
+    let deltaNoise = 0;
+    let noisyAction = false;
+
+    if (actions && actions.jumpTriggered) {
+      deltaNoise += config.jumpAdd;
+      noisyAction = true;
+    }
+    if (actions && actions.eatContactTriggered) {
+      deltaNoise += config.eatContactAdd;
+      noisyAction = true;
+    }
+    if (actions && actions.sucking) {
+      deltaNoise += config.suckRatePerSec * safeDt;
+      noisyAction = true;
+    } else if (actions && actions.rolling) {
+      deltaNoise += config.rollRatePerSec * safeDt;
+      noisyAction = true;
+    } else if (actions && actions.moving) {
+      deltaNoise += config.walkRatePerSec * safeDt;
+    }
+
+    if (noisyAction) {
+      level = GameRules.clampNoise(level + deltaNoise);
+    } else if (actions && actions.moving) {
+      level = GameRules.clampNoise(level + deltaNoise - config.activeDecayPerSec * safeDt);
+    } else {
+      level = GameRules.clampNoise(level - config.quietDecayPerSec * safeDt);
+    }
+
+    if (level >= config.dayTriggerThreshold) {
+      sustain += safeDt;
+    } else {
+      sustain = Math.max(0, sustain - safeDt * 1.5);
+    }
+
+    noiseState.level = level;
+    noiseState.aboveThresholdTime = sustain;
+    noiseState.shouldTriggerDay = (level >= config.dayTriggerThreshold && sustain >= config.dayTriggerSustainSec);
+    return noiseState;
+  },
+
+  stepDayNightCycle(cycleState, noiseState, dt, config = GameConfig.noise) {
+    const safeDt = GameRules.clampDelta(dt);
+    if (safeDt === 0) return { transitionedToDay: false, transitionedToNight: false };
+
+    let transitionedToDay = false;
+    let transitionedToNight = false;
+
+    if (!cycleState.isDay) {
+      if (noiseState && noiseState.shouldTriggerDay) {
+        cycleState.isDay = true;
+        cycleState.dayTimer = config.dayDurationSec;
+        cycleState.dayActivationCount = (cycleState.dayActivationCount || 0) + 1;
+        noiseState.shouldTriggerDay = false;
+        noiseState.aboveThresholdTime = 0;
+        transitionedToDay = true;
+      }
+    } else {
+      cycleState.dayTimer = Math.max(0, (cycleState.dayTimer || 0) - safeDt);
+      if (cycleState.dayTimer <= 0) {
+        cycleState.isDay = false;
+        cycleState.dayTimer = 0;
+        if (noiseState) {
+          noiseState.level = Math.min(noiseState.level, config.dayTriggerThreshold * 0.45);
+          noiseState.aboveThresholdTime = 0;
+          noiseState.shouldTriggerDay = false;
+        }
+        transitionedToNight = true;
+      }
+    }
+
+    return { transitionedToDay, transitionedToNight };
+  },
+
+  canTriggerVictory(state) {
+    if (!state) return false;
+    const total = state.totalFruits || 0;
+    const collected = state.collectedFruits || 0;
+    if (total <= 0 || collected < total) return false;
+    const pct = GameRules.calculateFruitPercentage(collected, total);
+    if (pct < 100) return false;
+    if (!state.reachedFinalPlatform) return false;
+    if (!state.seedPlanted) return false;
+    if (!state.plantGrown) return false;
+    if (!state.jumpedBackToStart) return false;
+    if (!state.onStartPlatform) return false;
+    return true;
+  }
+};
+/* END BOMB_TESTABLE_CORE */
+
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
+
+const diag = window.__BOMB_DIAGNOSTICS__;
+if (diag) {
+  diag.threeRevision = THREE.REVISION;
+  diag.bootBarriers.threeLoaded = true;
+}
+
+/* =========================================================================
+   CONTROLADOR DE AUDIO PROCEDURAL (DECISIÓN DE IMPLEMENTACIÓN, SILENCIABLE)
+   ========================================================================= */
+class AudioController {
+  constructor() {
+    this.ctx = null;
+    this.muted = false;
+    this.unlocked = false;
+  }
+
+  unlock() {
+    if (this.unlocked) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (AudioCtx) {
+        this.ctx = new AudioCtx();
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+        }
+        this.unlocked = true;
+      }
+    } catch (_e) {
+      // El juego sigue funcionando en silencio si el navegador bloquea AudioContext
+    }
+  }
+
+  toggleMute() {
+    this.muted = !this.muted;
+    return this.muted;
+  }
+
+  playTone(freq, duration = 0.12, type = 'sine', gainVal = 0.08, slideTo = null) {
+    if (this.muted || !this.unlocked || !this.ctx) return;
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+      if (slideTo) {
+        osc.frequency.exponentialRampToValueAtTime(Math.max(20, slideTo), now + duration);
+      }
+      gain.gain.setValueAtTime(gainVal, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + duration);
+    } catch (_e) {}
+  }
+
+  playJump() { this.playTone(220, 0.16, 'sine', 0.07, 460); }
+  playRoll() { this.playTone(130, 0.09, 'triangle', 0.05, 175); }
+  playSuck() { this.playTone(310, 0.11, 'sawtooth', 0.05, 520); }
+  playBite() { this.playTone(260, 0.08, 'square', 0.06, 150); }
+  playDayAlert() { this.playTone(540, 0.38, 'sawtooth', 0.09, 280); }
+  playNightReturn() { this.playTone(360, 0.32, 'sine', 0.06, 180); }
+  playPlant() { this.playTone(330, 0.25, 'triangle', 0.08, 660); }
+  playVictory() {
+    this.playTone(440, 0.18, 'triangle', 0.08, 554);
+    setTimeout(() => this.playTone(554, 0.22, 'triangle', 0.08, 659), 150);
+    setTimeout(() => this.playTone(659, 0.35, 'triangle', 0.09, 880), 320);
+  }
+}
+
+/* =========================================================================
+   GESTOR DE MODELOS GLB Y FALLBACK PROCEDIMENTAL EXPLÍCITO
+   ========================================================================= */
+class AssetManager {
+  constructor() {
+    this.loader = new GLTFLoader();
+    this.bombTemplate = null;
+    this.rossTemplate = null;
+  }
+
+  inspectGltfScene(rootScene) {
+    let meshes = 0;
+    let skinnedMeshes = 0;
+    let bones = 0;
+    const boneNames = [];
+    rootScene.traverse((obj) => {
+      if (obj.isSkinnedMesh) {
+        skinnedMeshes++;
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      } else if (obj.isMesh) {
+        meshes++;
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+      }
+      if (obj.isBone) {
+        bones++;
+        boneNames.push(obj.name);
+      }
+    });
+    return { meshes, skinnedMeshes, bones, boneNames };
+  }
+
+  normalizeModel(sceneRoot, targetHeight, rotateY = 0) {
+    const wrapper = new THREE.Group();
+    wrapper.name = 'NormalizedModelWrapper';
+    sceneRoot.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(sceneRoot);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    box.getSize(size);
+    box.getCenter(center);
+
+    const height = Math.max(0.001, size.y);
+    const scale = targetHeight / height;
+    sceneRoot.scale.multiplyScalar(scale);
+    sceneRoot.updateMatrixWorld(true);
+
+    const scaledBox = new THREE.Box3().setFromObject(sceneRoot);
+    const scaledCenter = new THREE.Vector3();
+    scaledBox.getCenter(scaledCenter);
+
+    sceneRoot.position.x -= scaledCenter.x;
+    sceneRoot.position.z -= scaledCenter.z;
+    sceneRoot.position.y -= scaledBox.min.y;
+
+    const orientGroup = new THREE.Group();
+    orientGroup.name = 'OrientationGroup';
+    orientGroup.rotation.y = rotateY;
+    orientGroup.add(sceneRoot);
+    wrapper.add(orientGroup);
+    return wrapper;
+  }
+
+  createFallbackBombModel() {
+    const group = new THREE.Group();
+    group.name = 'FallbackBombProcedural';
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x17171f, roughness: 0.65, metalness: 0.1 });
+    const bellyMat = new THREE.MeshStandardMaterial({ color: 0x52525b, roughness: 0.75 });
+    const beakMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, roughness: 0.45 });
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
+    const pupilMat = new THREE.MeshStandardMaterial({ color: 0x09090b });
+
+    const body = new THREE.Mesh(new THREE.SphereGeometry(1.05, 24, 20), bodyMat);
+    body.position.y = 1.05;
+    group.add(body);
+
+    const belly = new THREE.Mesh(new THREE.SphereGeometry(0.75, 18, 14), bellyMat);
+    belly.position.set(0, 0.78, 0.42);
+    group.add(belly);
+
+    const beak = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.55, 12), beakMat);
+    beak.rotation.x = Math.PI * 0.5;
+    beak.position.set(0, 1.12, 1.12);
+    group.add(beak);
+
+    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.19, 12, 12), eyeMat);
+    eyeL.position.set(-0.32, 1.32, 0.92);
+    const eyeR = eyeL.clone();
+    eyeR.position.x = 0.32;
+    group.add(eyeL, eyeR);
+
+    const pupL = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 10), pupilMat);
+    pupL.position.set(-0.32, 1.32, 1.08);
+    const pupR = pupL.clone();
+    pupR.position.x = 0.32;
+    group.add(pupL, pupR);
+
+    const fuse = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.09, 0.58, 10),
+      new THREE.MeshStandardMaterial({ color: 0xd97706, emissive: 0x7c2d12, emissiveIntensity: 0.4 })
+    );
+    fuse.position.set(0, 2.22, 0);
+    group.add(fuse);
+
+    return group;
+  }
+
+  createFallbackRossModel() {
+    const group = new THREE.Group();
+    group.name = 'FallbackRossProcedural';
+    const pigMat = new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.55 });
+    const snoutMat = new THREE.MeshStandardMaterial({ color: 0x86efac, roughness: 0.5 });
+    const eyeMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+    const pupilMat = new THREE.MeshStandardMaterial({ color: 0x09090b });
+
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.85, 20, 16), pigMat);
+    body.position.y = 0.85;
+    group.add(body);
+
+    const snout = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.35, 0.25, 14), snoutMat);
+    snout.rotation.x = Math.PI * 0.5;
+    snout.position.set(0, 0.9, 0.78);
+    group.add(snout);
+
+    const earL = new THREE.Mesh(new THREE.SphereGeometry(0.18, 10, 10), pigMat);
+    earL.position.set(-0.5, 1.55, 0.15);
+    const earR = earL.clone();
+    earR.position.x = 0.5;
+    group.add(earL, earR);
+
+    const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.15, 10, 10), eyeMat);
+    eyeL.position.set(-0.34, 1.1, 0.72);
+    const eyeR = eyeL.clone();
+    eyeR.position.x = 0.34;
+    group.add(eyeL, eyeR);
+
+    const pupL = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), pupilMat);
+    pupL.position.set(-0.34, 1.1, 0.85);
+    const pupR = pupL.clone();
+    pupR.position.x = 0.34;
+    group.add(pupL, pupR);
+
+    return group;
+  }
+
+  async loadRemoteModels() {
+    const bombUrl = diag.models.bomb.url;
+    const rossUrl = diag.models.ross.url;
+
+    // 1. Cargar Bomb
+    try {
+      const gltf = await this.loader.loadAsync(bombUrl);
+      const stats = this.inspectGltfScene(gltf.scene);
+      // Bomb tiene la cabeza en su +Z local; sin rotación extra la cámara (a -Z) ve la espalda (tercera persona)
+      this.bombTemplate = this.normalizeModel(gltf.scene, 2.35, 0);
+      diag.models.bomb.status = 'REMOTE_GLB_LOADED';
+      diag.models.bomb.source = 'REMOTE_GLB';
+      diag.models.bomb.meshes = stats.meshes;
+      diag.models.bomb.skinnedMeshes = stats.skinnedMeshes;
+      diag.models.bomb.bones = stats.bones;
+      diag.models.bomb.nativeClips = gltf.animations ? gltf.animations.length : 0;
+      diag.models.bomb.error = null;
+    } catch (err) {
+      const msg = err && err.message ? err.message : String(err);
+      this.bombTemplate = this.createFallbackBombModel();
+      diag.models.bomb.status = 'FALLBACK_PROCEDURAL';
+      diag.models.bomb.source = 'PROCEDURAL_FALLBACK';
+      diag.models.bomb.error = msg;
+      diag.recordResourceFailure({ url: bombUrl, tag: 'GLB_BOMB', reason: msg });
+    }
+
+    // 2. Cargar Ross
+    try {
+      const gltf = await this.loader.loadAsync(rossUrl);
+      const stats = this.inspectGltfScene(gltf.scene);
+      this.rossRawScene = gltf.scene;
+      diag.models.ross.status = 'REMOTE_GLB_LOADED';
+      diag.models.ross.source = 'REMOTE_GLB';
+      diag.models.ross.meshes = stats.meshes;
+      diag.models.ross.skinnedMeshes = stats.skinnedMeshes;
+      diag.models.ross.bones = stats.bones;
+      diag.models.ross.nativeClips = gltf.animations ? gltf.animations.length : 0;
+      diag.models.ross.error = null;
+    } catch (err) {
+      const msg = err && err.message ? err.message : String(err);
+      this.rossRawScene = null;
+      diag.models.ross.status = 'FALLBACK_PROCEDURAL';
+      diag.models.ross.source = 'PROCEDURAL_FALLBACK';
+      diag.models.ross.error = msg;
+      diag.recordResourceFailure({ url: rossUrl, tag: 'GLB_ROSS', reason: msg });
+    }
+
+    diag.bootBarriers.modelsResolved = true;
+  }
+
+  async loadLocalFile(kind, file) {
+    if (!file) return false;
+    const buffer = await file.arrayBuffer();
+    const gltf = await this.loader.parseAsync(buffer, '');
+    const stats = this.inspectGltfScene(gltf.scene);
+    if (kind === 'bomb') {
+      this.bombTemplate = this.normalizeModel(gltf.scene, 2.35, 0);
+      diag.models.bomb.status = 'LOCAL_GLB_LOADED';
+      diag.models.bomb.source = 'LOCAL_GLB';
+      diag.models.bomb.meshes = stats.meshes;
+      diag.models.bomb.skinnedMeshes = stats.skinnedMeshes;
+      diag.models.bomb.bones = stats.bones;
+      diag.models.bomb.nativeClips = gltf.animations ? gltf.animations.length : 0;
+      diag.models.bomb.error = null;
+    } else if (kind === 'ross') {
+      this.rossRawScene = gltf.scene;
+      diag.models.ross.status = 'LOCAL_GLB_LOADED';
+      diag.models.ross.source = 'LOCAL_GLB';
+      diag.models.ross.meshes = stats.meshes;
+      diag.models.ross.skinnedMeshes = stats.skinnedMeshes;
+      diag.models.ross.bones = stats.bones;
+      diag.models.ross.nativeClips = gltf.animations ? gltf.animations.length : 0;
+      diag.models.ross.error = null;
+    }
+    return true;
+  }
+
+  instantiateBomb() {
+    if (this.bombTemplate) {
+      return SkeletonUtils.clone(this.bombTemplate);
+    }
+    return this.createFallbackBombModel();
+  }
+
+  instantiateRoss() {
+    if (this.rossRawScene) {
+      const clonedScene = SkeletonUtils.clone(this.rossRawScene);
+      clonedScene.traverse((obj) => {
+        if ((obj.isMesh || obj.isSkinnedMesh) && obj.material) {
+          obj.material = obj.material.clone();
+        }
+      });
+      return this.normalizeModel(clonedScene, 1.85, 0);
+    }
+    return this.createFallbackRossModel();
+  }
+}
+
+/* =========================================================================
+   5. SISTEMA DE ANIMACIÓN DE BOMB (CLIPS PROCEDURALES + MIXER + TRANSFORMACIONES)
+   ========================================================================= */
+class PlayerAnimator {
+  constructor(visualGroup, rigNode) {
+    this.visualGroup = visualGroup;
+    this.rigNode = rigNode;
+    this.mixer = new THREE.AnimationMixer(this.rigNode);
+    this.actions = {};
+    this.currentState = 'Idle';
+    this.stateTime = 0;
+    this.buildProceduralClips();
+  }
+
+  buildProceduralClips() {
+    const stateNames = [
+      'Idle',
+      'Locomotion',
+      'JumpAnticipation',
+      'JumpAscending',
+      'JumpFalling',
+      'Landing',
+      'Roll',
+      'Suck',
+      'EatContact',
+      'HitStagger',
+      'Victory'
+    ];
+
+    const makeClip = (name, duration, scaleKeys, posKeys) => {
+      const tracks = [
+        new THREE.VectorKeyframeTrack('.scale', scaleKeys.times, scaleKeys.values),
+        new THREE.VectorKeyframeTrack('.position', posKeys.times, posKeys.values)
+      ];
+      return new THREE.AnimationClip(name, duration, tracks);
+    };
+
+    const clips = [
+      makeClip('Idle', 1.6,
+        { times: [0, 0.8, 1.6], values: [1, 1, 1, 1.03, 0.97, 1.03, 1, 1, 1] },
+        { times: [0, 0.8, 1.6], values: [0, 0, 0, 0, 0.04, 0, 0, 0, 0] }
+      ),
+      makeClip('Locomotion', 0.48,
+        { times: [0, 0.12, 0.24, 0.36, 0.48], values: [1, 1, 1, 0.96, 1.05, 0.96, 1, 1, 1, 0.96, 1.05, 0.96, 1, 1, 1] },
+        { times: [0, 0.12, 0.24, 0.36, 0.48], values: [0, 0, 0, 0, 0.18, 0, 0, 0, 0, 0, 0.18, 0, 0, 0, 0] }
+      ),
+      makeClip('JumpAnticipation', 0.12,
+        { times: [0, 0.12], values: [1, 1, 1, 1.16, 0.82, 1.16] },
+        { times: [0, 0.12], values: [0, 0, 0, 0, -0.1, 0] }
+      ),
+      makeClip('JumpAscending', 0.5,
+        { times: [0, 0.5], values: [0.88, 1.16, 0.88, 0.94, 1.08, 0.94] },
+        { times: [0, 0.5], values: [0, 0.08, 0, 0, 0.04, 0] }
+      ),
+      makeClip('JumpFalling', 0.5,
+        { times: [0, 0.5], values: [0.95, 1.06, 0.95, 1.05, 0.94, 1.05] },
+        { times: [0, 0.5], values: [0, 0, 0, 0, -0.04, 0] }
+      ),
+      makeClip('Landing', 0.22,
+        { times: [0, 0.09, 0.22], values: [1.22, 0.76, 1.22, 0.95, 1.05, 0.95, 1, 1, 1] },
+        { times: [0, 0.09, 0.22], values: [0, -0.12, 0, 0, 0.03, 0, 0, 0, 0] }
+      ),
+      makeClip('Roll', 0.4,
+        { times: [0, 0.2, 0.4], values: [1.08, 0.9, 1.08, 0.94, 1.04, 0.94, 1.08, 0.9, 1.08] },
+        { times: [0, 0.2, 0.4], values: [0, 0.05, 0, 0, 0.12, 0, 0, 0.05, 0] }
+      ),
+      makeClip('Suck', 0.36,
+        { times: [0, 0.18, 0.36], values: [1.14, 0.92, 1.18, 1.24, 0.86, 1.26, 1.14, 0.92, 1.18] },
+        { times: [0, 0.18, 0.36], values: [0, 0, 0.05, 0, -0.04, 0.12, 0, 0, 0.05] }
+      ),
+      makeClip('EatContact', 0.28,
+        { times: [0, 0.14, 0.28], values: [1, 1, 1, 1.18, 0.84, 1.2, 1, 1, 1] },
+        { times: [0, 0.14, 0.28], values: [0, 0, 0, 0, 0.16, 0.18, 0, 0, 0] }
+      ),
+      makeClip('HitStagger', 0.35,
+        { times: [0, 0.17, 0.35], values: [1.2, 0.8, 1.2, 0.9, 1.12, 0.9, 1, 1, 1] },
+        { times: [0, 0.17, 0.35], values: [0, 0.15, -0.15, 0, 0.05, 0.08, 0, 0, 0] }
+      ),
+      makeClip('Victory', 0.7,
+        { times: [0, 0.2, 0.45, 0.7], values: [1.12, 0.88, 1.12, 0.9, 1.18, 0.9, 1.06, 0.95, 1.06, 1, 1, 1] },
+        { times: [0, 0.2, 0.45, 0.7], values: [0, 0, 0, 0, 0.65, 0, 0, 0.12, 0, 0, 0, 0] }
+      )
+    ];
+
+    clips.forEach((clip) => {
+      const action = this.mixer.clipAction(clip);
+      if (clip.name === 'JumpAnticipation' || clip.name === 'Landing') {
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+      }
+      this.actions[clip.name] = action;
+    });
+
+    this.actions.Idle.play();
+    if (diag && diag.models && diag.models.bomb) {
+      diag.models.bomb.proceduralClips = stateNames;
+    }
+  }
+
+  setState(nextState) {
+    if (!this.actions[nextState] || this.currentState === nextState) return;
+    const prevAction = this.actions[this.currentState];
+    const nextAction = this.actions[nextState];
+    if (prevAction) prevAction.fadeOut(0.1);
+    nextAction.reset().fadeIn(0.1).play();
+    this.currentState = nextState;
+    this.stateTime = 0;
+    if (diag && diag.live) {
+      diag.live.playerState = nextState;
+    }
+  }
+
+  update(dt, speedRatio = 0) {
+    this.stateTime += dt;
+    this.mixer.update(dt);
+
+    // Transformaciones secundarias en visualGroup para expresar claramente cada estado
+    if (this.currentState === 'Roll') {
+      this.visualGroup.rotation.x += dt * 13.5;
+      this.visualGroup.rotation.z = Math.sin(this.stateTime * 14) * 0.08;
+    } else if (this.currentState === 'Locomotion') {
+      this.visualGroup.rotation.x = THREE.MathUtils.lerp(this.visualGroup.rotation.x, 0.14 * Math.min(1, speedRatio), 0.2);
+      this.visualGroup.rotation.z = Math.sin(this.stateTime * 12) * 0.11 * Math.min(1, speedRatio);
+    } else if (this.currentState === 'Suck') {
+      this.visualGroup.rotation.x = THREE.MathUtils.lerp(this.visualGroup.rotation.x, -0.18, 0.25);
+      this.visualGroup.rotation.z = Math.sin(this.stateTime * 28) * 0.07;
+    } else if (this.currentState === 'EatContact') {
+      this.visualGroup.rotation.x = Math.sin(this.stateTime * 24) * 0.28;
+      this.visualGroup.rotation.z = Math.cos(this.stateTime * 18) * 0.1;
+    } else if (this.currentState === 'Victory') {
+      this.visualGroup.rotation.x = THREE.MathUtils.lerp(this.visualGroup.rotation.x, 0, 0.2);
+      this.visualGroup.rotation.y += dt * 4.2;
+      this.visualGroup.rotation.z = Math.sin(this.stateTime * 9) * 0.12;
+    } else {
+      this.visualGroup.rotation.x = THREE.MathUtils.lerp(this.visualGroup.rotation.x, 0, 0.22);
+      this.visualGroup.rotation.z = THREE.MathUtils.lerp(this.visualGroup.rotation.z, 0, 0.22);
+    }
+  }
+}
+
+/* =========================================================================
+   5.4. SISTEMA DE ANIMACIÓN DE ROSS
+   Procedural sobre el esqueleto real del GLB de Ross (38 huesos).
+   Captura la pose de reposo en cada hueso al construir el animator para
+   poder componer los estados como deltas sobre esa base y restaurarla al
+   cambiar de estado (sin acumulación, sin T-pose residual).
+   Huesos objetivo descubiertos por nombre (regex robusta) para no asumir
+   rutas rígidas.
+   ========================================================================= */
+class EnemyAnimator {
+  constructor(visualGroup, rigNode) {
+    this.visualGroup = visualGroup;
+    this.rigNode = rigNode;
+    this.mixer = new THREE.AnimationMixer(this.rigNode);
+    this.actions = {};
+    this.currentState = 'Sleep';
+    this.stateTime = Math.random() * 3.0;
+    this.bones = {};
+    this.bonesByName = new Map(); // lowercase name → bone
+    this.restPose = new Map();    // bone → {q:Quaternion, p:Vector3, s:Vector3}
+    this.collectBones();
+    this.captureRestPose();
+    this.discoverLimbBones();
+    this.buildClips();
+    this.applyRestPose();
+  }
+
+  collectBones() {
+    this.rigNode.traverse((obj) => {
+      if (obj.isBone) {
+        this.bones[obj.name] = obj;
+        this.bonesByName.set(obj.name.toLowerCase(), obj);
+      }
+    });
+  }
+
+  captureRestPose() {
+    this.restPose.clear();
+    for (const bone of this.bonesByName.values()) {
+      this.restPose.set(bone, {
+        q: bone.quaternion.clone(),
+        p: bone.position.clone(),
+        s: bone.scale.clone()
+      });
+    }
+  }
+
+  applyRestPose() {
+    for (const [bone, rest] of this.restPose.entries()) {
+      bone.quaternion.copy(rest.q);
+      bone.position.copy(rest.p);
+      bone.scale.copy(rest.s);
+    }
+  }
+
+  // Encuentra el primer hueso cuyo nombre coincida con cualquiera de los
+  // patrones; devuelve null si no existe (no lanza). Patrones en minúsculas.
+  findBoneByPatterns(patterns) {
+    for (const bone of this.bonesByName.values()) {
+      const n = bone.name.toLowerCase();
+      for (const re of patterns) if (re.test(n)) return bone;
+    }
+    return null;
+  }
+
+  discoverLimbBones() {
+    // Patrones derivados del esqueleto real de Ross (Mixamo export vía Sketchfab):
+    //   e_8           → cuello/cabeza (Point006_6 es el pivote de la cara)
+    //   r_sh_12, l_sh_20 → hombros
+    //   r_ua_11, l_ua_19 → brazos superiores
+    //   r_la_10, l_la_18 → antebrazos
+    //   r_ha_9,  l_ha_17 → manos
+    //   r_foot_26, l_foot_29 → pies (rotación X produce el paso)
+    //   Bone017_16, Bone013_22 → muslos/rodillas (pivotan para caminar)
+    //   root_body_31 / root_all_32 → torso general (rebote de carrera)
+    this.limbs = {
+      head:    this.findBoneByPatterns([/^e_8$/, /head/, /neck/, /cuello/]),
+      rShoulder: this.findBoneByPatterns([/^r_sh_/]),
+      lShoulder: this.findBoneByPatterns([/^l_sh_/]),
+      rUpperArm: this.findBoneByPatterns([/^r_ua_/]),
+      lUpperArm: this.findBoneByPatterns([/^l_ua_/]),
+      rForearm:  this.findBoneByPatterns([/^r_la_/]),
+      lForearm:  this.findBoneByPatterns([/^l_la_/]),
+      rHand:     this.findBoneByPatterns([/^r_ha_/]),
+      lHand:     this.findBoneByPatterns([/^l_ha_/]),
+      rThigh:    this.findBoneByPatterns([/bone017_/, /r_thigh/, /right_thigh/]),
+      lThigh:    this.findBoneByPatterns([/bone013_/, /l_thigh/, /left_thigh/]),
+      rFoot:     this.findBoneByPatterns([/^r_foot_/]),
+      lFoot:     this.findBoneByPatterns([/^l_foot_/]),
+      body:      this.findBoneByPatterns([/^root_body_/, /root_all_/])
+    };
+  }
+
+  setBoneDelta(bone, dx = 0, dy = 0, dz = 0) {
+    if (!bone) return;
+    const rest = this.restPose.get(bone);
+    if (!rest) return;
+    // Compone la rotación de reposo con un delta Euler local sin acumular:
+    // cada frame partimos SIEMPRE del quaternion de reposo.
+    const q = _tmpQuat.setFromEuler(_tmpEuler.set(dx, dy, dz, 'XYZ'));
+    bone.quaternion.copy(rest.q).multiply(q);
+  }
+
+  buildClips() {
+    const clipNames = ['Sleep', 'Wake', 'SwarmChase', 'Return', 'SleepRecovery', 'ImpactReaction'];
+    const makeClip = (name, duration, scaleTimes, scaleVals, posTimes, posVals) => {
+      return new THREE.AnimationClip(name, duration, [
+        new THREE.VectorKeyframeTrack('.scale', scaleTimes, scaleVals),
+        new THREE.VectorKeyframeTrack('.position', posTimes, posVals)
+      ]);
+    };
+
+    const clips = [
+      makeClip('Sleep', 2.0,
+        [0, 1.0, 2.0], [1.05, 0.88, 1.05, 1.12, 0.82, 1.12, 1.05, 0.88, 1.05],
+        [0, 1.0, 2.0], [0, 0, 0, 0, -0.04, 0, 0, 0, 0]
+      ),
+      makeClip('Wake', 0.45,
+        [0, 0.2, 0.45], [1.1, 0.82, 1.1, 0.84, 1.28, 0.84, 1, 1, 1],
+        [0, 0.2, 0.45], [0, 0, 0, 0, 0.45, 0, 0, 0, 0]
+      ),
+      makeClip('SwarmChase', 0.32,
+        [0, 0.08, 0.16, 0.24, 0.32], [1, 1, 1, 0.9, 1.14, 0.9, 1, 1, 1, 0.9, 1.14, 0.9, 1, 1, 1],
+        [0, 0.08, 0.16, 0.24, 0.32], [0, 0, 0, 0, 0.28, 0, 0, 0, 0, 0, 0.28, 0, 0, 0, 0]
+      ),
+      makeClip('Return', 0.52,
+        [0, 0.26, 0.52], [1, 1, 1, 0.96, 1.06, 0.96, 1, 1, 1],
+        [0, 0.26, 0.52], [0, 0, 0, 0, 0.14, 0, 0, 0, 0]
+      ),
+      makeClip('SleepRecovery', 0.6,
+        [0, 0.3, 0.6], [1, 1, 1, 1.08, 0.86, 1.08, 1.05, 0.88, 1.05],
+        [0, 0.3, 0.6], [0, 0, 0, 0, -0.03, 0, 0, 0, 0]
+      ),
+      makeClip('ImpactReaction', 0.35,
+        [0, 0.15, 0.35], [1.22, 0.78, 1.22, 0.9, 1.12, 0.9, 1, 1, 1],
+        [0, 0.15, 0.35], [0, 0.22, -0.1, 0, 0.08, 0, 0, 0, 0]
+      )
+    ];
+
+    clips.forEach((clip) => {
+      const act = this.mixer.clipAction(clip);
+      this.actions[clip.name] = act;
+    });
+    this.actions.Sleep.play();
+
+    if (diag && diag.models && diag.models.ross) {
+      diag.models.ross.proceduralClips = clipNames;
+    }
+  }
+
+  setState(nextState) {
+    if (!this.actions[nextState] || this.currentState === nextState) return;
+    const prev = this.actions[this.currentState];
+    const next = this.actions[nextState];
+    if (prev) prev.fadeOut(0.1);
+    next.reset().fadeIn(0.1).play();
+    this.currentState = nextState;
+    this.stateTime = 0;
+    // Restaurar SIEMPRE la pose de reposo al cambiar de estado para que
+    // ningún hueso quede congelado en una rotación anterior (T-pose residual,
+    // brazos colgando en pose de carrera, etc.).
+    this.applyRestPose();
+  }
+
+  update(dt) {
+    this.stateTime += dt;
+    this.mixer.update(dt);
+
+    const t = this.stateTime;
+    const s = this.state;
+    if (this.currentState === 'Sleep' || this.currentState === 'SleepRecovery') {
+      this.visualGroup.rotation.x = THREE.MathUtils.lerp(this.visualGroup.rotation.x, 0.18, 0.15);
+      this.visualGroup.rotation.z = Math.sin(t * 2.2) * 0.05;
+      // Respiración muy sutil sobre el cuerpo + cabeceo lento
+      if (this.limbs.head)  this.setBoneDelta(this.limbs.head, 0.08, 0, -0.06 + Math.sin(t * 2.0) * 0.05);
+      if (this.limbs.body)  this.setBoneDelta(this.limbs.body, 0, 0, Math.sin(t * 1.6) * 0.015);
+      if (this.limbs.rFoot) this.setBoneDelta(this.limbs.rFoot, Math.sin(t * 1.2) * 0.04);
+      if (this.limbs.lFoot) this.setBoneDelta(this.limbs.lFoot, Math.sin(t * 1.2 + Math.PI) * 0.04);
+    } else if (this.currentState === 'Wake') {
+      const k = THREE.MathUtils.clamp(t / GameConfig.enemies.wakeDuration, 0, 1);
+      // Cabeza se levanta al despertar
+      if (this.limbs.head) this.setBoneDelta(this.limbs.head, THREE.MathUtils.lerp(-0.1, 0.2, k), 0, 0);
+      if (this.limbs.body) this.setBoneDelta(this.limbs.body, -k * 0.05, 0, 0);
+    } else if (this.currentState === 'SwarmChase') {
+      // Carrera en enjambre: bombeo de brazos, zancada de piernas, rebote del torso, cabeceo
+      this.visualGroup.rotation.x = 0.26 + Math.sin(t * 22) * 0.12;
+      this.visualGroup.rotation.z = Math.cos(t * 20) * 0.14;
+      const phase = t * 14.0;
+      const stride = Math.sin(phase);
+      const strideC = Math.cos(phase);
+      if (this.limbs.body)      this.setBoneDelta(this.limbs.body, 0.06, 0, strideC * 0.05);
+      if (this.limbs.head)      this.setBoneDelta(this.limbs.head, -0.05, stride * 0.08, 0.05);
+      // Brazos: hombro adelante/atrás en alternancia (pitch X), codo sigue (flex X), mano leve
+      if (this.limbs.rShoulder) this.setBoneDelta(this.limbs.rShoulder, stride * 0.95, 0, 0);
+      if (this.limbs.lShoulder) this.setBoneDelta(this.limbs.lShoulder, -stride * 0.95, 0, 0);
+      if (this.limbs.rUpperArm) this.setBoneDelta(this.limbs.rUpperArm, Math.max(0, stride) * 0.6, 0, 0);
+      if (this.limbs.lUpperArm) this.setBoneDelta(this.limbs.lUpperArm, Math.max(0, -stride) * 0.6, 0, 0);
+      if (this.limbs.rForearm)  this.setBoneDelta(this.limbs.rForearm, 0.25 + Math.max(0, stride) * 0.4, 0, 0);
+      if (this.limbs.lForearm)  this.setBoneDelta(this.limbs.lForearm, 0.25 + Math.max(0, -stride) * 0.4, 0, 0);
+      if (this.limbs.rHand)     this.setBoneDelta(this.limbs.rHand, stride * 0.3, 0, 0);
+      if (this.limbs.lHand)     this.setBoneDelta(this.limbs.lHand, -stride * 0.3, 0, 0);
+      // Piernas: muslo + pie en alternancia para zancada clara
+      if (this.limbs.rThigh)    this.setBoneDelta(this.limbs.rThigh, stride * 0.55, 0, 0);
+      if (this.limbs.lThigh)    this.setBoneDelta(this.limbs.lThigh, -stride * 0.55, 0, 0);
+      if (this.limbs.rFoot)     this.setBoneDelta(this.limbs.rFoot, stride * 0.45, 0, 0);
+      if (this.limbs.lFoot)     this.setBoneDelta(this.limbs.lFoot, -stride * 0.45, 0, 0);
+    } else if (this.currentState === 'Return') {
+      // Regreso más calmado: paso ligero, cabeza mirando al hogar
+      this.visualGroup.rotation.x = 0.1;
+      this.visualGroup.rotation.z = Math.sin(t * 11) * 0.08;
+      const stride = Math.sin(t * 8.0);
+      if (this.limbs.rShoulder) this.setBoneDelta(this.limbs.rShoulder, stride * 0.35, 0, 0);
+      if (this.limbs.lShoulder) this.setBoneDelta(this.limbs.lShoulder, -stride * 0.35, 0, 0);
+      if (this.limbs.rFoot)     this.setBoneDelta(this.limbs.rFoot, stride * 0.3, 0, 0);
+      if (this.limbs.lFoot)     this.setBoneDelta(this.limbs.lFoot, -stride * 0.3, 0, 0);
+      if (this.limbs.head)      this.setBoneDelta(this.limbs.head, 0.05, 0, -0.05);
+    } else if (this.currentState === 'ImpactReaction') {
+      const k = THREE.MathUtils.clamp(t / 0.35, 0, 1);
+      const back = (1 - k) * 0.55;
+      if (this.limbs.head) this.setBoneDelta(this.limbs.head, -back, 0, 0);
+      if (this.limbs.body) this.setBoneDelta(this.limbs.body, back * 0.5, 0, 0);
+    } else {
+      this.visualGroup.rotation.x = THREE.MathUtils.lerp(this.visualGroup.rotation.x, 0, 0.2);
+      this.visualGroup.rotation.z = THREE.MathUtils.lerp(this.visualGroup.rotation.z, 0, 0.2);
+      this.applyRestPose();
+    }
+  }
+}
+
+// Buffers reutilizables para setBoneDelta (evita allocs por frame).
+const _tmpEuler = new THREE.Euler();
+const _tmpQuat = new THREE.Quaternion();
+
+/* =========================================================================
+   7. CONSTRUCCIÓN DEL NIVEL (ANILLO, AGUA CENTRAL, PLATAFORMA INICIAL Y FINAL, POTE, SEMILLA Y PLANTA)
+   ========================================================================= */
+class LevelBuilder {
+  constructor(scene) {
+    this.scene = scene;
+    this.group = new THREE.Group();
+    this.group.name = 'LevelEnvironment';
+    this.scene.add(this.group);
+
+    this.startCenter = new THREE.Vector3(GameConfig.ring.midRadius, 0, 0);
+    const endA = GameConfig.ring.endAngle;
+    this.finalCenter = new THREE.Vector3(
+      Math.cos(endA) * GameConfig.ring.midRadius,
+      0,
+      Math.sin(endA) * GameConfig.ring.midRadius
+    );
+    // Posiciones en la plataforma final: pote, semilla y rampa de elevación hacia el vacío
+    this.potPosition = new THREE.Vector3(
+      this.finalCenter.x + 1.5,
+      0,
+      this.finalCenter.z - 2.0
+    );
+    this.seedSpawnPosition = new THREE.Vector3(
+      this.finalCenter.x - 2.2,
+      0.55,
+      this.finalCenter.z - 2.4
+    );
+    const rampAngle = GameConfig.ring.endAngle + 0.035;
+    this.rampCenter = new THREE.Vector3(
+      Math.cos(rampAngle) * GameConfig.ring.midRadius,
+      0,
+      Math.sin(rampAngle) * GameConfig.ring.midRadius
+    );
+
+    this.waterMesh = null;
+    this.seedMesh = null;
+    this.potGroup = null;
+    this.plantGroup = null;
+    this.buildGeometry();
+  }
+
+  buildGeometry() {
+    const { innerRadius, outerRadius, waterRadius, endAngle } = GameConfig.ring;
+
+    // 1. Agua central (no caminable, oscura de noche)
+    const waterGeo = new THREE.CylinderGeometry(waterRadius, waterRadius, 0.8, 56);
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x0a192f,
+      roughness: 0.25,
+      metalness: 0.65
+    });
+    this.waterMesh = new THREE.Mesh(waterGeo, waterMat);
+    this.waterMesh.position.set(0, -0.55, 0);
+    this.waterMesh.name = 'CentralWater';
+    this.group.add(this.waterMesh);
+
+    // Borde rocoso interior que delimita el agua
+    const rimGeo = new THREE.TorusGeometry(innerRadius - 0.2, 0.45, 10, 64, endAngle);
+    const rimMat = new THREE.MeshStandardMaterial({ color: 0x1e1b2e, roughness: 0.9 });
+    const rimMesh = new THREE.Mesh(rimGeo, rimMat);
+    rimMesh.rotation.x = Math.PI * 0.5;
+    rimMesh.position.y = -0.05;
+    this.group.add(rimMesh);
+
+    // 2. Pista anular principal (con vacío real antes de cerrar el círculo)
+    const ringShape = new THREE.Shape();
+    ringShape.absarc(0, 0, outerRadius, 0, endAngle, false);
+    ringShape.lineTo(Math.cos(endAngle) * innerRadius, Math.sin(endAngle) * innerRadius);
+    ringShape.absarc(0, 0, innerRadius, endAngle, 0, true);
+    ringShape.closePath();
+
+    const extrudeSettings = { depth: 1.2, bevelEnabled: false, curveSegments: 64 };
+    const ringGeo = new THREE.ExtrudeGeometry(ringShape, extrudeSettings);
+    // Rotamos +90° en X y trasladamos para que el ángulo 0..endAngle coincida con atan2(z, x) y la cara superior quede en Y = 0
+    ringGeo.rotateX(Math.PI * 0.5);
+    ringGeo.translate(0, 0, 0);
+
+    const groundMat = new THREE.MeshStandardMaterial({
+      color: 0x231934,
+      roughness: 0.88,
+      metalness: 0.08
+    });
+    const ringMesh = new THREE.Mesh(ringGeo, groundMat);
+    ringMesh.receiveShadow = true;
+    ringMesh.name = 'CircularTrackRing';
+    this.group.add(ringMesh);
+
+    // 3. Plataforma inicial (conectada al inicio del anillo en ángulo 0)
+    const startPlatGeo = new THREE.CylinderGeometry(
+      GameConfig.ring.startPlatformRadius,
+      GameConfig.ring.startPlatformRadius + 0.8,
+      1.25,
+      32
+    );
+    const startPlatMat = new THREE.MeshStandardMaterial({ color: 0x2e1f47, roughness: 0.82 });
+    const startPlat = new THREE.Mesh(startPlatGeo, startPlatMat);
+    startPlat.position.set(this.startCenter.x, -0.6, this.startCenter.z);
+    startPlat.receiveShadow = true;
+    startPlat.name = 'InitialPlatform';
+    this.group.add(startPlat);
+
+    // Marcador circular en la plataforma inicial
+    const startRing = new THREE.Mesh(
+      new THREE.RingGeometry(2.4, 2.9, 28),
+      new THREE.MeshBasicMaterial({ color: 0xa855f7, side: THREE.DoubleSide })
+    );
+    startRing.rotation.x = -Math.PI * 0.5;
+    startRing.position.set(this.startCenter.x, 0.03, this.startCenter.z);
+    this.group.add(startRing);
+
+    // 4. Plataforma final (más amplia, antes del vacío que la separa de la inicial)
+    const finalPlatGeo = new THREE.CylinderGeometry(
+      GameConfig.ring.finalPlatformRadius,
+      GameConfig.ring.finalPlatformRadius + 1.0,
+      1.25,
+      32
+    );
+    const finalPlatMat = new THREE.MeshStandardMaterial({ color: 0x31204d, roughness: 0.82 });
+    const finalPlat = new THREE.Mesh(finalPlatGeo, finalPlatMat);
+    finalPlat.position.set(this.finalCenter.x, -0.6, this.finalCenter.z);
+    finalPlat.receiveShadow = true;
+    finalPlat.name = 'FinalPlatform';
+    this.group.add(finalPlat);
+
+    // 5. Elevación del terreno en la plataforma final para saltar el vacío hacia el inicio
+    const moundGeo = new THREE.ConeGeometry(4.2, GameConfig.ring.elevationHeight, 24);
+    const moundMat = new THREE.MeshStandardMaterial({ color: 0x3b275e, roughness: 0.85 });
+    const moundMesh = new THREE.Mesh(moundGeo, moundMat);
+    moundMesh.position.set(this.rampCenter.x, GameConfig.ring.elevationHeight * 0.5 - 0.1, this.rampCenter.z);
+    moundMesh.name = 'FinalElevationMound';
+    this.group.add(moundMesh);
+
+    // 6. Pote marrón con tierra en la plataforma final
+    this.potGroup = new THREE.Group();
+    this.potGroup.position.copy(this.potPosition);
+    this.potGroup.name = 'BrownPotWithSoil';
+
+    const potMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.75 });
+    const potBody = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 0.85, 1.25, 20), potMat);
+    potBody.position.y = 0.62;
+    const potRim = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.14, 10, 24), potMat);
+    potRim.rotation.x = Math.PI * 0.5;
+    potRim.position.y = 1.22;
+    const soilMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.06, 1.06, 0.18, 18),
+      new THREE.MeshStandardMaterial({ color: 0x3f2305, roughness: 0.95 })
+    );
+    soilMesh.position.y = 1.15;
+    this.potGroup.add(potBody, potRim, soilMesh);
+    this.group.add(this.potGroup);
+
+    // 7. Semilla parecida a una bellota junto al pote
+    this.seedMesh = new THREE.Group();
+    this.seedMesh.position.copy(this.seedSpawnPosition);
+    this.seedMesh.name = 'AcornSeed';
+    const nutBody = new THREE.Mesh(
+      new THREE.SphereGeometry(0.42, 14, 12),
+      new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.5, emissive: 0x451a03, emissiveIntensity: 0.35 })
+    );
+    nutBody.scale.set(0.9, 1.2, 0.9);
+    const nutCap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.46, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55),
+      new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.85 })
+    );
+    nutCap.position.y = 0.12;
+    const nutStem = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.05, 0.25, 8),
+      new THREE.MeshStandardMaterial({ color: 0x4ade80 })
+    );
+    nutStem.position.y = 0.52;
+    this.seedMesh.add(nutBody, nutCap, nutStem);
+    this.group.add(this.seedMesh);
+
+    // 8. Planta pequeña escalable (crece al plantar la semilla en el pote)
+    this.plantGroup = new THREE.Group();
+    this.plantGroup.position.copy(this.potPosition);
+    this.plantGroup.position.y = 1.15;
+    this.plantGroup.scale.set(0.001, 0.001, 0.001);
+    this.plantGroup.visible = false;
+    this.plantGroup.name = 'ClimbablePlant';
+
+    const stemMat = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.55, emissive: 0x14532d, emissiveIntensity: 0.3 });
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.34, 3.6, 14), stemMat);
+    stem.position.y = 1.8;
+    this.plantGroup.add(stem);
+
+    for (let i = 0; i < 4; i++) {
+      const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.65, 12, 10), stemMat);
+      leaf.scale.set(1.4, 0.35, 0.9);
+      const a = (i * Math.PI) * 0.5;
+      leaf.position.set(Math.cos(a) * 0.65, 0.85 + i * 0.75, Math.sin(a) * 0.65);
+      this.plantGroup.add(leaf);
+    }
+    this.group.add(this.plantGroup);
+  }
+
+  normalizeAnglePositive(angle) {
+    const twoPi = Math.PI * 2;
+    return ((angle % twoPi) + twoPi) % twoPi;
+  }
+
+  isPositionSupported(x, z) {
+    const distStart = Math.hypot(x - this.startCenter.x, z - this.startCenter.z);
+    if (distStart <= GameConfig.ring.startPlatformRadius) return true;
+
+    const distFinal = Math.hypot(x - this.finalCenter.x, z - this.finalCenter.z);
+    if (distFinal <= GameConfig.ring.finalPlatformRadius) return true;
+
+    const r = Math.hypot(x, z);
+    if (r < GameConfig.ring.innerRadius || r > GameConfig.ring.outerRadius) return false;
+
+    const angle = this.normalizeAnglePositive(Math.atan2(z, x));
+    return angle <= GameConfig.ring.endAngle;
+  }
+
+  isOnStartPlatform(x, z) {
+    return Math.hypot(x - this.startCenter.x, z - this.startCenter.z) <= GameConfig.ring.startPlatformRadius - 0.8;
+  }
+
+  isOnFinalPlatform(x, z) {
+    return Math.hypot(x - this.finalCenter.x, z - this.finalCenter.z) <= GameConfig.ring.finalPlatformRadius;
+  }
+
+  getGroundHeightAt(x, z, plantGrown = false) {
+    if (!this.isPositionSupported(x, z)) {
+      return -99;
+    }
+    let h = 0;
+    // Elevación del terreno en la plataforma final
+    const distRamp = Math.hypot(x - this.rampCenter.x, z - this.rampCenter.z);
+    if (distRamp < 4.2) {
+      const rampH = (1 - distRamp / 4.2) * (GameConfig.ring.elevationHeight - 0.2);
+      if (rampH > h) h = rampH;
+    }
+    // Planta escalable cuando ya creció
+    if (plantGrown) {
+      const distPlant = Math.hypot(x - this.potPosition.x, z - this.potPosition.z);
+      if (distPlant < 1.65) {
+        h = Math.max(h, 4.2);
+      }
+    }
+    return h;
+  }
+
+  update(dt, elapsed, isDay) {
+    if (this.waterMesh) {
+      this.waterMesh.position.y = -0.55 + Math.sin(elapsed * 1.8) * 0.05;
+      this.waterMesh.material.color.setHex(isDay ? 0x1d4ed8 : 0x071120);
+    }
+  }
+}
+
+/* =========================================================================
+   8. FRUTAS DEL DRAGÓN MORADAS Y RECOLECCIÓN (SUCCIÓN + COMER POR CONTACTO)
+   ========================================================================= */
+class FruitManager {
+  constructor(scene) {
+    this.scene = scene;
+    this.group = new THREE.Group();
+    this.group.name = 'PurpleDragonFruits';
+    this.scene.add(this.group);
+    this.fruits = [];
+  }
+
+  createDragonFruitMesh() {
+    const root = new THREE.Group();
+    root.name = 'PurpleDragonFruit';
+
+    // Exterior 100 % morado/violeta salvo el único tallo verde circular superior
+    const skinMat = new THREE.MeshStandardMaterial({
+      color: 0x9333ea,
+      emissive: 0x7e22ce,
+      emissiveIntensity: 1.15,
+      roughness: 0.35,
+      metalness: 0.1
+    });
+    const scaleMat = new THREE.MeshStandardMaterial({
+      color: 0xa855f7,
+      emissive: 0x9333ea,
+      emissiveIntensity: 0.95,
+      roughness: 0.4
+    });
+
+    const body = new THREE.Mesh(new THREE.SphereGeometry(0.58, 18, 16), skinMat);
+    body.scale.set(0.92, 1.22, 0.92);
+    body.position.y = 0.72;
+    root.add(body);
+
+    // Escamas ovaladas completamente moradas
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const scaleFin = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.34, 6), scaleMat);
+      scaleFin.position.set(Math.cos(a) * 0.48, 0.72 + (i % 2) * 0.18 - 0.09, Math.sin(a) * 0.48);
+      scaleFin.rotation.z = -Math.cos(a) * 0.45;
+      scaleFin.rotation.x = Math.sin(a) * 0.45;
+      root.add(scaleFin);
+    }
+
+    // Único tallo verde pequeño y circular
+    const stemMat = new THREE.MeshStandardMaterial({
+      color: 0x4ade80,
+      emissive: 0x166534,
+      emissiveIntensity: 0.4,
+      roughness: 0.5
+    });
+    const greenStem = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.16, 16), stemMat);
+    greenStem.position.y = 1.45;
+    greenStem.name = 'CircularGreenStem';
+    root.add(greenStem);
+
+    // Interior con pulpa morada y semillas (visible durante EatContact)
+    const interiorGroup = new THREE.Group();
+    interiorGroup.name = 'DragonFruitInteriorPulpAndSeeds';
+    interiorGroup.visible = false;
+    interiorGroup.position.y = 0.72;
+
+    const pulpMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.46, 0.46, 0.22, 16),
+      new THREE.MeshStandardMaterial({ color: 0xc084fc, emissive: 0x7e22ce, emissiveIntensity: 0.7 })
+    );
+    pulpMesh.rotation.x = Math.PI * 0.5;
+    interiorGroup.add(pulpMesh);
+
+    const seedDotMat = new THREE.MeshBasicMaterial({ color: 0x1e1b4b });
+    for (let s = 0; s < 9; s++) {
+      const sa = (s / 9) * Math.PI * 2;
+      const sr = (s % 2 === 0) ? 0.18 : 0.31;
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 6), seedDotMat);
+      dot.position.set(Math.cos(sa) * sr, Math.sin(sa) * sr, 0.12);
+      interiorGroup.add(dot);
+    }
+    root.add(interiorGroup);
+
+    // Halo emisivo discreto sin luces dinámicas costosas
+    const halo = new THREE.Mesh(
+      new THREE.RingGeometry(0.65, 1.05, 20),
+      new THREE.MeshBasicMaterial({ color: 0xc084fc, side: THREE.DoubleSide, transparent: true, opacity: 0.55 })
+    );
+    halo.rotation.x = -Math.PI * 0.5;
+    halo.position.y = 0.04;
+    root.add(halo);
+
+    return { root, body, interiorGroup, halo, skinMat };
+  }
+
+  spawnFruitsForGuardPosts(posts) {
+    this.fruits.forEach((f) => {
+      if (f.mesh) this.group.remove(f.mesh);
+    });
+    this.fruits = [];
+
+    posts.forEach((post, idx) => {
+      const record = GameRules.createFruitRecord(idx, post.fruitPos.x, 0, post.fruitPos.z);
+      const built = this.createDragonFruitMesh();
+      built.root.position.set(record.x, record.y, record.z);
+      this.group.add(built.root);
+      this.fruits.push({
+        record,
+        origin: new THREE.Vector3(record.x, record.y, record.z),
+        mesh: built.root,
+        body: built.body,
+        interiorGroup: built.interiorGroup,
+        halo: built.halo,
+        skinMat: built.skinMat
+      });
+    });
+  }
+
+  update(dt, elapsed, isDay) {
+    for (const f of this.fruits) {
+      if (f.record.state === FruitStates.COLLECTED) {
+        f.mesh.visible = false;
+        continue;
+      }
+      f.mesh.visible = true;
+      if (f.record.state === FruitStates.AVAILABLE) {
+        f.mesh.position.y = Math.sin(elapsed * 2.8 + f.record.id) * 0.12;
+        f.mesh.rotation.y += dt * 1.1;
+        f.interiorGroup.visible = false;
+        f.body.visible = true;
+      } else if (f.record.state === FruitStates.EATING) {
+        // Mostrar la pulpa morada con semillas durante la secuencia de mordiscos
+        f.interiorGroup.visible = true;
+        f.mesh.rotation.y += dt * 6.0;
+      }
+      f.skinMat.emissiveIntensity = isDay ? 0.45 : 1.35;
+      f.halo.material.opacity = isDay ? 0.22 : 0.62;
+    }
+  }
+}
+
+/* =========================================================================
+   POOL DE PARTÍCULAS REUTILIZABLES (JUGO MORADO, SUCCIÓN DE AIRE, ATERRIZAJE)
+   ========================================================================= */
+class ParticlePool {
+  constructor(scene, maxCount = 60) {
+    this.scene = scene;
+    this.pool = [];
+    const geo = new THREE.SphereGeometry(0.11, 8, 8);
+    for (let i = 0; i < maxCount; i++) {
+      const mat = new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.9 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      this.scene.add(mesh);
+      this.pool.push({
+        mesh,
+        velocity: new THREE.Vector3(),
+        life: 0,
+        maxLife: 0.5,
+        gravity: 0
+      });
+    }
+  }
+
+  spawnBurst(origin, count, colorHex, speed = 4.5, gravity = 12.0, maxLife = 0.45) {
+    let spawned = 0;
+    for (const p of this.pool) {
+      if (p.life <= 0) {
+        p.life = maxLife;
+        p.maxLife = maxLife;
+        p.gravity = gravity;
+        p.mesh.material.color.setHex(colorHex);
+        p.mesh.position.copy(origin);
+        const angle = Math.random() * Math.PI * 2;
+        const elev = 0.3 + Math.random() * 0.8;
+        p.velocity.set(
+          Math.cos(angle) * speed * (0.4 + Math.random() * 0.6),
+          elev * speed,
+          Math.sin(angle) * speed * (0.4 + Math.random() * 0.6)
+        );
+        p.mesh.visible = true;
+        spawned++;
+        if (spawned >= count) break;
+      }
+    }
+  }
+
+  spawnSuctionStream(fromPos, toPos) {
+    for (const p of this.pool) {
+      if (p.life <= 0) {
+        p.life = 0.22;
+        p.maxLife = 0.22;
+        p.gravity = 0;
+        p.mesh.material.color.setHex(0xd8b4fe);
+        const t = Math.random() * 0.5;
+        p.mesh.position.lerpVectors(fromPos, toPos, t);
+        p.mesh.position.y += 0.6 + (Math.random() - 0.5) * 0.4;
+        p.velocity.subVectors(toPos, p.mesh.position).multiplyScalar(4.2);
+        p.mesh.visible = true;
+        break;
+      }
+    }
+  }
+
+  update(dt) {
+    for (const p of this.pool) {
+      if (p.life > 0) {
+        p.life -= dt;
+        if (p.life <= 0) {
+          p.mesh.visible = false;
+          continue;
+        }
+        p.velocity.y -= p.gravity * dt;
+        p.mesh.position.addScaledVector(p.velocity, dt);
+        const ratio = Math.max(0.1, p.life / p.maxLife);
+        p.mesh.scale.setScalar(ratio);
+        p.mesh.material.opacity = ratio;
+      }
+    }
+  }
+}
+
+/* =========================================================================
+   10. ENEMIGOS (ROSS) Y MÁQUINA DE ESTADOS DE ENJAMBRE / CAMUFLAJE NOCTURNO
+   ========================================================================= */
+class Enemy {
+  constructor(id, postAngle, postRadius, modelInstance, scene) {
+    this.id = id;
+    this.homeAngle = postAngle;
+    this.homeRadius = postRadius;
+    this.homePosition = new THREE.Vector3(
+      Math.cos(postAngle) * postRadius,
+      0,
+      Math.sin(postAngle) * postRadius
+    );
+    this.position = this.homePosition.clone();
+    this.state = EnemyStates.SLEEPING;
+    this.stateTimer = 0;
+    this.swarmOffsetAngle = ((id % 5) - 2) * 0.025;
+    this.swarmOffsetRadius = ((id % 3) - 1) * 1.35;
+
+    this.root = new THREE.Group();
+    this.root.name = `EnemyRoss_${id}`;
+    this.root.position.copy(this.position);
+
+    this.visualGroup = new THREE.Group();
+    this.rigNode = new THREE.Group();
+    this.rigNode.add(modelInstance);
+    this.visualGroup.add(this.rigNode);
+    this.root.add(this.visualGroup);
+
+    // Orientar inicialmente mirando hacia la fruta delante de su puesto
+    this.heading = postAngle - Math.PI * 0.5;
+    this.root.rotation.y = this.heading;
+
+    // Estela discreta reutilizable para el efecto borroso de persecución diurna
+    this.trailGroup = new THREE.Group();
+    this.trailGroup.visible = false;
+    const trailGeo = new THREE.SphereGeometry(0.55, 10, 8);
+    const trailMat = new THREE.MeshBasicMaterial({
+      color: 0x4ade80,
+      transparent: true,
+      opacity: 0.26
+    });
+    this.trailA = new THREE.Mesh(trailGeo, trailMat);
+    this.trailA.position.set(0, 0.85, -0.75);
+    this.trailB = new THREE.Mesh(trailGeo, trailMat.clone());
+    this.trailB.material.opacity = 0.14;
+    this.trailB.position.set(0, 0.85, -1.45);
+    this.trailGroup.add(this.trailA, this.trailB);
+    this.root.add(this.trailGroup);
+
+    scene.add(this.root);
+
+    this.materials = [];
+    this._tintApplied = -1;
+    modelInstance.traverse((obj) => {
+      if ((obj.isMesh || obj.isSkinnedMesh) && obj.material) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        mats.forEach((m) => {
+          if (!m.color) return;
+          // Guardamos colores base SOLO si la malla es realmente visible
+          // (descartamos la malla del material "material" que viene con
+          // alphaMode BLEND + baseColorFactor.a=0: es invisible siempre).
+          const isGhost = (m.transparent === true && (m.opacity === 0 || (m.opacity != null && m.opacity < 0.01)));
+          if (isGhost) return;
+          if (!m.userData.baseColor) {
+            m.userData.baseColor = m.color.clone();
+          }
+          if (m.emissive && !m.userData.baseEmissive) {
+            m.userData.baseEmissive = m.emissive.clone();
+          }
+          this.materials.push(m);
+        });
+      }
+    });
+
+    this.animator = new EnemyAnimator(this.visualGroup, this.rigNode);
+    // Aplicar camuflaje nocturno inicial (la transición se interpola cada frame).
+    this.applyCamouflage(false);
+  }
+
+  // Tinte basado en dayBlend (0 = noche plena, 1 = día pleno).
+  // Conserva una copia base por material y lerpea tanto color como emissive
+  // para que la transición día/noche sea continua y no un salto binario.
+  applyCamouflage(isDay) {
+    const nightFactor = isDay ? 0 : 1;
+    const target = GameConfig.enemies.nightCamouflage;
+    const floor  = GameConfig.enemies.nightEmissiveFloor;
+    // Reutilizamos la lógica de _applyTint(blend) para no duplicar código.
+    this._applyTint(nightFactor, target, floor);
+    this._tintApplied = nightFactor;
+  }
+
+  _applyTint(dayBlend, target = GameConfig.enemies.nightCamouflage, floor = GameConfig.enemies.nightEmissiveFloor) {
+    // dayBlend 0..1; en 0 → camuflaje nocturno (color base * target),
+    // en 1 → color original. Interpolación continua.
+    if (Math.abs((this._tintApplied ?? -1) - dayBlend) < 0.005) return;
+    this._tintApplied = dayBlend;
+    for (const mat of this.materials) {
+      const base = mat.userData.baseColor;
+      if (!base) continue;
+      const r = base.r * (target + (1 - target) * dayBlend);
+      const g = base.g * (target + (1 - target) * dayBlend);
+      const b = base.b * (target + (1 - target) * dayBlend);
+      mat.color.setRGB(r, g, b);
+      const baseE = mat.userData.baseEmissive;
+      if (baseE && mat.emissive) {
+        // De noche dejamos un brillo emisivo mínimo para que los ojos y
+        // los detalles del modelo no desaparezcan en la oscuridad.
+        const nightBoost = 1 - dayBlend;
+        const er = baseE.r * (floor + (1 - floor) * dayBlend) + nightBoost * floor * 0.5;
+        const eg = baseE.g * (floor + (1 - floor) * dayBlend) + nightBoost * floor * 0.5;
+        const eb = baseE.b * (floor + (1 - floor) * dayBlend) + nightBoost * floor * 0.5;
+        mat.emissive.setRGB(er, eg, eb);
+      }
+    }
+  }
+
+  triggerDayWake() {
+    this.state = EnemyStates.WAKING;
+    this.stateTimer = GameConfig.enemies.wakeDuration;
+    this.animator.setState('Wake');
+    this._applyTint(1);
+    this.trailGroup.visible = false;
+  }
+
+  triggerNightReturn() {
+    if (this.state !== EnemyStates.SLEEPING) {
+      this.state = EnemyStates.RETURNING;
+      this.stateTimer = 0;
+      this.animator.setState('Return');
+    }
+    this.trailGroup.visible = false;
+    this._applyTint(0);
+  }
+
+  resetToHome() {
+    this.state = EnemyStates.SLEEPING;
+    this.stateTimer = 0;
+    this.position.copy(this.homePosition);
+    this.root.position.copy(this.position);
+    this.heading = this.homeAngle - Math.PI * 0.5;
+    this.root.rotation.y = this.heading;
+    this.trailGroup.visible = false;
+    this.animator.setState('Sleep');
+    // Restaurar TODAS las rotaciones del esqueleto a la pose de reposo
+    // capturada en el animator (evita T-pose residual o miembros congelados).
+    if (this.animator && typeof this.animator.applyRestPose === 'function') {
+      this.animator.applyRestPose();
+    }
+    this.visualGroup.rotation.set(0, 0, 0);
+    this._applyTint(0);
+  }
+
+  moveAlongRingToward(targetAngle, targetRadius, speed, dt) {
+    const curAngle = ((Math.atan2(this.position.z, this.position.x) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const curRadius = Math.hypot(this.position.x, this.position.z);
+
+    const maxLinearStep = speed * dt;
+    const angularSpeed = maxLinearStep / Math.max(GameConfig.ring.innerRadius, curRadius);
+    const diffAngle = targetAngle - curAngle;
+
+    let nextAngle = curAngle;
+    if (Math.abs(diffAngle) <= angularSpeed) {
+      nextAngle = targetAngle;
+    } else {
+      nextAngle += Math.sign(diffAngle) * angularSpeed;
+    }
+    // Respetar límites del anillo (no cruzar el vacío ni el agua central)
+    nextAngle = Math.max(0.02, Math.min(GameConfig.ring.endAngle - 0.02, nextAngle));
+
+    const radialStep = Math.min(Math.abs(targetRadius - curRadius), speed * 0.65 * dt);
+    let nextRadius = curRadius + Math.sign(targetRadius - curRadius) * radialStep;
+    nextRadius = Math.max(GameConfig.ring.innerRadius + 1.4, Math.min(GameConfig.ring.outerRadius - 1.4, nextRadius));
+
+    const prevX = this.position.x;
+    const prevZ = this.position.z;
+    this.position.x = Math.cos(nextAngle) * nextRadius;
+    this.position.z = Math.sin(nextAngle) * nextRadius;
+    this.root.position.copy(this.position);
+
+    const dx = this.position.x - prevX;
+    const dz = this.position.z - prevZ;
+    if (Math.hypot(dx, dz) > 0.001) {
+      this.heading = Math.atan2(dx, dz);
+      this.root.rotation.y = this.heading;
+    }
+  }
+
+  update(dt, playerPos) {
+    if (this.state === EnemyStates.WAKING) {
+      this.stateTimer -= dt;
+      if (this.stateTimer <= 0) {
+        this.state = EnemyStates.SWARM_CHASE;
+        this.animator.setState('SwarmChase');
+        this.trailGroup.visible = true;
+      }
+    } else if (this.state === EnemyStates.SWARM_CHASE) {
+      const pAngle = ((Math.atan2(playerPos.z, playerPos.x) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      const clampedTargetAngle = Math.max(0.04, Math.min(GameConfig.ring.endAngle - 0.04, pAngle + this.swarmOffsetAngle));
+      const pRadius = Math.hypot(playerPos.x, playerPos.z);
+      const clampedTargetRadius = Math.max(
+        GameConfig.ring.innerRadius + 1.6,
+        Math.min(GameConfig.ring.outerRadius - 1.6, pRadius + this.swarmOffsetRadius)
+      );
+      this.moveAlongRingToward(clampedTargetAngle, clampedTargetRadius, GameConfig.enemies.chaseSpeed, dt);
+      this.trailGroup.visible = true;
+    } else if (this.state === EnemyStates.RETURNING) {
+      this.moveAlongRingToward(this.homeAngle, this.homeRadius, GameConfig.enemies.returnSpeed, dt);
+      const distHome = this.position.distanceTo(this.homePosition);
+      if (distHome < 0.45) {
+        this.position.copy(this.homePosition);
+        this.root.position.copy(this.position);
+        this.state = EnemyStates.SLEEP_RECOVERY;
+        this.stateTimer = GameConfig.enemies.recoveryDuration;
+        this.animator.setState('SleepRecovery');
+      }
+    } else if (this.state === EnemyStates.SLEEP_RECOVERY) {
+      this.stateTimer -= dt;
+      if (this.stateTimer <= 0) {
+        this.state = EnemyStates.SLEEPING;
+        this.heading = this.homeAngle - Math.PI * 0.5;
+        this.root.rotation.y = this.heading;
+        this.animator.setState('Sleep');
+      }
+    }
+
+    this.animator.update(dt);
+  }
+}
+
+/* =========================================================================
+   6. PROTAGONISTA JUGABLE (BOMB) — FÍSICAS, MOVIMIENTO, SUCCIÓN, MORDISCOS Y SEMILLA
+   ========================================================================= */
+class Player {
+  constructor(modelInstance, scene) {
+    this.scene = scene;
+    this.root = new THREE.Group();
+    this.root.name = 'PlayerBombRoot';
+    this.scene.add(this.root);
+
+    this.visualGroup = new THREE.Group();
+    this.rigNode = new THREE.Group();
+    this.rigNode.add(modelInstance);
+    this.visualGroup.add(this.rigNode);
+    this.root.add(this.visualGroup);
+
+    // Anillo visual de vórtice durante la succión (tipo Vacpack / Kirby)
+    this.suctionCone = new THREE.Mesh(
+      new THREE.ConeGeometry(1.15, 3.8, 16, 1, true),
+      new THREE.MeshBasicMaterial({
+        color: 0xd8b4fe,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.48
+      })
+    );
+    this.suctionCone.rotation.x = -Math.PI * 0.5;
+    this.suctionCone.position.set(0, 1.05, 2.2);
+    this.suctionCone.visible = false;
+    this.root.add(this.suctionCone);
+
+    this.position = new THREE.Vector3(GameConfig.ring.midRadius, 0, 0);
+    this.velocity = new THREE.Vector3(0, 0, 0);
+    this.heading = 0; // Mira hacia +Z al inicio para avanzar por el anillo
+    this.onGround = true;
+    this.landingTimer = 0;
+    this.staggerTimer = 0;
+
+    // Estado de alimentación (succión o mordiscos por contacto)
+    this.suckingTarget = null;
+    this.eatingTarget = null;
+    this.eatTimer = 0;
+    this.biteSoundAccum = 0;
+
+    // Semilla y recorrido
+    this.carryingSeed = false;
+
+    this.animator = new PlayerAnimator(this.visualGroup, this.rigNode);
+    this.syncTransform();
+  }
+
+  replaceModel(newModelInstance) {
+    while (this.rigNode.children.length > 0) {
+      this.rigNode.remove(this.rigNode.children[0]);
+    }
+    this.rigNode.add(newModelInstance);
+  }
+
+  reset(startPos) {
+    this.position.copy(startPos);
+    this.velocity.set(0, 0, 0);
+    this.heading = 0;
+    this.onGround = true;
+    this.landingTimer = 0;
+    this.staggerTimer = 0;
+    this.suckingTarget = null;
+    this.eatingTarget = null;
+    this.eatTimer = 0;
+    this.carryingSeed = false;
+    this.suctionCone.visible = false;
+    this.visualGroup.rotation.set(0, 0, 0);
+    // Bomb no tiene esqueleto pero el AnimationMixer deja residuo en
+    // rigNode.scale/position; los devolvemos a identidad para que la
+    // pose Idle arranque desde un estado limpio tras un reinicio.
+    this.rigNode.scale.set(1, 1, 1);
+    this.rigNode.position.set(0, 0, 0);
+    if (this.animator && this.animator.actions) {
+      // Re-arranca la acción Idle desde el principio.
+      const idle = this.animator.actions.Idle;
+      if (idle) {
+        idle.reset().play();
+      }
+    }
+    this.animator.setState('Idle');
+    this.syncTransform();
+  }
+
+  syncTransform() {
+    const safe = GameRules.sanitizeVec3(this.position, { x: GameConfig.ring.midRadius, y: 0, z: 0 });
+    this.position.set(safe.x, safe.y, safe.z);
+    this.root.position.copy(this.position);
+    this.root.rotation.y = this.heading;
+  }
+}
+
+/* =========================================================================
+   6.1. CÁMARA EN TERCERA PERSONA DETRÁS DE BOMB
+   ========================================================================= */
+class CameraController {
+  constructor(camera) {
+    this.camera = camera;
+    this.currentPos = new THREE.Vector3();
+    this.currentLookAt = new THREE.Vector3();
+    this.distance = 10.8;
+    this.height = 5.4;
+    this.lookAhead = 3.2;
+    this.initialized = false;
+  }
+
+  snapToPlayer(player) {
+    const backX = -Math.sin(player.heading) * this.distance;
+    const backZ = -Math.cos(player.heading) * this.distance;
+    this.currentPos.set(
+      player.position.x + backX,
+      player.position.y + this.height,
+      player.position.z + backZ
+    );
+    this.currentLookAt.set(
+      player.position.x + Math.sin(player.heading) * this.lookAhead,
+      player.position.y + 1.4,
+      player.position.z + Math.cos(player.heading) * this.lookAhead
+    );
+    this.camera.position.copy(this.currentPos);
+    this.camera.lookAt(this.currentLookAt);
+    this.initialized = true;
+  }
+
+  update(dt, player) {
+    if (!this.initialized) {
+      this.snapToPlayer(player);
+      return;
+    }
+    const backX = -Math.sin(player.heading) * this.distance;
+    const backZ = -Math.cos(player.heading) * this.distance;
+    const desiredPos = new THREE.Vector3(
+      player.position.x + backX,
+      Math.max(2.2, player.position.y + this.height),
+      player.position.z + backZ
+    );
+    const desiredLook = new THREE.Vector3(
+      player.position.x + Math.sin(player.heading) * this.lookAhead,
+      player.position.y + 1.35,
+      player.position.z + Math.cos(player.heading) * this.lookAhead
+    );
+
+    const smooth = 1 - Math.exp(-8.5 * dt);
+    this.currentPos.lerp(desiredPos, smooth);
+    this.currentLookAt.lerp(desiredLook, smooth);
+    this.camera.position.copy(this.currentPos);
+    this.camera.lookAt(this.currentLookAt);
+  }
+}
+
+/* =========================================================================
+   13. CONTROLADOR DE ENTRADA (TECLADO + POINTER EVENTS MÓVIL)
+   ========================================================================= */
+class InputController {
+  constructor(onPauseToggle) {
+    this.keys = new Set();
+    this.joyVec = { x: 0, y: 0 };
+    this.joyPointerId = null;
+    this.touchActions = {
+      jump: false,
+      roll: false,
+      suck: false,
+      interact: false
+    };
+    this.justPressed = {
+      jump: false,
+      interact: false
+    };
+    this.onPauseToggle = onPauseToggle;
+    this.bindEvents();
+  }
+
+  bindEvents() {
+    window.addEventListener('keydown', (e) => {
+      const code = e.code;
+      if (code === 'Escape' || code === 'KeyP') {
+        if (!e.repeat && this.onPauseToggle) this.onPauseToggle();
+        return;
+      }
+      if (code === 'Space' && !this.keys.has('Space')) {
+        this.justPressed.jump = true;
+      }
+      if ((code === 'KeyF' || code === 'KeyL') && !this.keys.has(code)) {
+        this.justPressed.interact = true;
+      }
+      this.keys.add(code);
+    });
+
+    window.addEventListener('keyup', (e) => {
+      this.keys.delete(e.code);
+    });
+
+    window.addEventListener('blur', () => this.releaseAll());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.releaseAll();
+    });
+
+    // Joystick virtual con Pointer Events
+    const joyZone = document.getElementById('joystick-zone');
+    const joyKnob = document.getElementById('joystick-knob');
+    if (joyZone && joyKnob) {
+      const maxRadius = 38;
+      const updateJoystick = (clientX, clientY) => {
+        const rect = joyZone.getBoundingClientRect();
+        const cx = rect.left + rect.width * 0.5;
+        const cy = rect.top + rect.height * 0.5;
+        let dx = clientX - cx;
+        let dy = clientY - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > maxRadius) {
+          dx = (dx / dist) * maxRadius;
+          dy = (dy / dist) * maxRadius;
+        }
+        joyKnob.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
+        this.joyVec.x = dx / maxRadius;
+        this.joyVec.y = dy / maxRadius;
+      };
+
+      const resetJoystick = () => {
+        this.joyPointerId = null;
+        this.joyVec.x = 0;
+        this.joyVec.y = 0;
+        joyKnob.style.transform = 'translate(0px, 0px)';
+      };
+
+      joyZone.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        this.joyPointerId = e.pointerId;
+        if (joyZone.setPointerCapture) {
+          try { joyZone.setPointerCapture(e.pointerId); } catch (_err) {}
+        }
+        updateJoystick(e.clientX, e.clientY);
+      });
+
+      joyZone.addEventListener('pointermove', (e) => {
+        if (this.joyPointerId !== e.pointerId) return;
+        e.preventDefault();
+        updateJoystick(e.clientX, e.clientY);
+      });
+
+      joyZone.addEventListener('pointerup', (e) => {
+        if (this.joyPointerId === e.pointerId) resetJoystick();
+      });
+
+      joyZone.addEventListener('pointercancel', (e) => {
+        if (this.joyPointerId === e.pointerId) resetJoystick();
+      });
+    }
+
+    // Botones táctiles de acción
+    const bindHoldBtn = (id, keyName, isTrigger = false) => {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      const press = (e) => {
+        e.preventDefault();
+        this.touchActions[keyName] = true;
+        if (isTrigger) this.justPressed[keyName] = true;
+        btn.classList.add('active');
+      };
+      const release = (e) => {
+        if (e) e.preventDefault();
+        this.touchActions[keyName] = false;
+        btn.classList.remove('active');
+      };
+      btn.addEventListener('pointerdown', press);
+      btn.addEventListener('pointerup', release);
+      btn.addEventListener('pointercancel', release);
+      btn.addEventListener('pointerleave', release);
+    };
+
+    bindHoldBtn('btn-touch-jump', 'jump', true);
+    bindHoldBtn('btn-touch-roll', 'roll', false);
+    bindHoldBtn('btn-touch-suck', 'suck', false);
+    bindHoldBtn('btn-touch-interact', 'interact', true);
+  }
+
+  releaseAll() {
+    this.keys.clear();
+    this.joyVec.x = 0;
+    this.joyVec.y = 0;
+    this.joyPointerId = null;
+    const joyKnob = document.getElementById('joystick-knob');
+    if (joyKnob) joyKnob.style.transform = 'translate(0px, 0px)';
+    Object.keys(this.touchActions).forEach((k) => { this.touchActions[k] = false; });
+    Object.keys(this.justPressed).forEach((k) => { this.justPressed[k] = false; });
+    document.querySelectorAll('.touch-btn.active').forEach((el) => el.classList.remove('active'));
+  }
+
+  readFrameInput() {
+    let moveForward = 0;
+    let turnInput = 0;
+
+    if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) moveForward += 1;
+    if (this.keys.has('KeyS') || this.keys.has('ArrowDown')) moveForward -= 1;
+    if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) turnInput += 1;
+    if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) turnInput -= 1;
+
+    if (Math.abs(this.joyVec.y) > 0.08) moveForward += -this.joyVec.y;
+    if (Math.abs(this.joyVec.x) > 0.08) turnInput += -this.joyVec.x;
+
+    moveForward = Math.max(-1, Math.min(1, moveForward));
+    turnInput = Math.max(-1, Math.min(1, turnInput));
+
+    const jumpTriggered = this.justPressed.jump;
+    const interactTriggered = this.justPressed.interact;
+    this.justPressed.jump = false;
+    this.justPressed.interact = false;
+
+    const rolling = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') || this.touchActions.roll;
+    const sucking = this.keys.has('KeyE') || this.keys.has('KeyK') || this.touchActions.suck;
+
+    return {
+      moveForward,
+      turnInput,
+      jumpTriggered,
+      interactTriggered,
+      rolling,
+      sucking
+    };
+  }
+}
+
+/* =========================================================================
+   20. CLASE PRINCIPAL DEL JUEGO (BUCLE DE 14 PASOS, ESTADOS, UI Y DIAGNÓSTICO)
+   ========================================================================= */
+class Game {
+  constructor() {
+    this.canvas = document.getElementById('game-canvas');
+    this.audio = new AudioController();
+    this.assets = new AssetManager();
+
+    this.state = GameStates.LOADING;
+    this.previousPlayState = GameStates.PLAYING_NIGHT;
+    this.elapsed = 0;
+    this.lastFrameTime = performance.now();
+
+    // Estado lógico compartido con GameRules
+    this.progressState = {
+      totalFruits: GameConfig.totalFruits,
+      collectedFruits: 0,
+      percentage: 0,
+      reachedFinalPlatform: false,
+      seedPlanted: false,
+      plantGrown: false,
+      jumpedBackToStart: false,
+      onStartPlatform: true
+    };
+
+    this.noiseState = {
+      level: 0,
+      aboveThresholdTime: 0,
+      shouldTriggerDay: false
+    };
+
+    this.cycleState = {
+      isDay: false,
+      dayTimer: 0,
+      dayActivationCount: 0,
+      blend: 0
+    };
+
+    this.guardPosts = [];
+    this.enemies = [];
+    this.plantGrowProgress = 0;
+    this.leftStartPlatformOnce = false;
+    this.jumpedFromFinalPlatform = false;
+
+    this.initRendererAndScene();
+    this.bindUIButtons();
+  }
+
+  initRendererAndScene() {
+    try {
+      this.renderer = new THREE.WebGLRenderer({
+        canvas: this.canvas,
+        antialias: true,
+        powerPreference: 'high-performance'
+      });
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
+      this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+      // Tono suave para coherencia día/noche; ACES evita que los modelos se vean
+      // como manchas planas bajo el rango dinámico del nivel. Es una
+      // configuración del renderer, no un cambio de iluminación artificial.
+      this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      this.renderer.toneMappingExposure = 1.05;
+      diag.rendererStatus = 'WEBGL_READY';
+      diag.bootBarriers.rendererInitialized = true;
+    } catch (err) {
+      diag.rendererStatus = 'WEBGL_FAILED';
+      diag.recordError({
+        type: 'renderer.init',
+        message: err && err.message ? err.message : 'Fallo al inicializar WebGLRenderer',
+        severity: 'fatal'
+      });
+      throw err;
+    }
+
+    this.scene = new THREE.Scene();
+    this.nightBgColor = new THREE.Color(0x06030d);
+    this.dayBgColor = new THREE.Color(0x60a5fa);
+    this.scene.background = this.nightBgColor.clone();
+    this.scene.fog = new THREE.FogExp2(0x06030d, 0.012);
+
+    this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / Math.max(1, window.innerHeight), 0.2, 220);
+    this.cameraController = new CameraController(this.camera);
+    diag.bootBarriers.sceneAndCameraReady = true;
+
+    // Iluminación nocturna oscura + transición diurna
+    this.ambientLight = new THREE.AmbientLight(0x3b2768, 0.48);
+    this.scene.add(this.ambientLight);
+
+    this.dirLight = new THREE.DirectionalLight(0xa78bfa, 0.55);
+    this.dirLight.position.set(28, 45, 22);
+    this.scene.add(this.dirLight);
+
+    // Luz suave focal sobre Bomb para mantener su silueta legible de noche
+    this.playerLight = new THREE.PointLight(0xc084fc, 1.1, 14, 1.5);
+    this.scene.add(this.playerLight);
+
+    this.level = new LevelBuilder(this.scene);
+    this.fruitManager = new FruitManager(this.scene);
+    this.particles = new ParticlePool(this.scene, 64);
+    this.input = new InputController(() => this.togglePause());
+
+    window.addEventListener('resize', () => this.onResize());
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && (this.state === GameStates.PLAYING_NIGHT || this.state === GameStates.PLAYING_DAY)) {
+        this.pauseGame();
+      }
+    });
+  }
+
+  async boot() {
+    this.updateAssetStatusUI();
+    await this.assets.loadRemoteModels();
+    this.buildEntities();
+
+    diag.bootBarriers.systemsBuilt = true;
+    this.setState(GameStates.MENU);
+    diag.bootBarriers.initialStateCoherent = true;
+    this.updateAssetStatusUI();
+    this.updateHUD();
+
+    const startBtn = document.getElementById('btn-start-game');
+    if (startBtn) {
+      startBtn.disabled = false;
+      startBtn.textContent = 'Comenzar Partida';
+    }
+
+    // Renderizar primer fotograma real para garantizar escena activa desde el menú
+    this.cameraController.snapToPlayer(this.player);
+    this.renderer.render(this.scene, this.camera);
+
+    this.lastFrameTime = performance.now();
+    requestAnimationFrame((now) => this.loop(now));
+  }
+
+  buildEntities() {
+    // Crear protagonista Bomb
+    const bombModel = this.assets.instantiateBomb();
+    if (!this.player) {
+      this.player = new Player(bombModel, this.scene);
+    } else {
+      this.player.replaceModel(bombModel);
+    }
+    this.player.reset(this.level.startCenter);
+
+    // Crear los 12 puestos de guardia con Ross y una fruta morada delante de cada uno
+    this.enemies.forEach((e) => {
+      if (e.root) this.scene.remove(e.root);
+    });
+    this.enemies = [];
+    this.guardPosts = [];
+
+    const total = GameConfig.totalFruits;
+    const minAngle = 0.24;
+    const maxAngle = GameConfig.ring.endAngle - 0.24;
+
+    for (let i = 0; i < total; i++) {
+      const t = total > 1 ? i / (total - 1) : 0.5;
+      const postAngle = minAngle + t * (maxAngle - minAngle);
+      const radialOffset = (i % 2 === 0) ? 2.2 : -2.2;
+      const enemyRadius = GameConfig.ring.midRadius + radialOffset;
+
+      // Fruta situada justo delante del enemigo dormido (un poco antes en el sentido del recorrido)
+      const fruitAngle = postAngle - 0.055;
+      const fruitRadius = enemyRadius - radialOffset * 0.35;
+      const fruitPos = new THREE.Vector3(
+        Math.cos(fruitAngle) * fruitRadius,
+        0,
+        Math.sin(fruitAngle) * fruitRadius
+      );
+
+      this.guardPosts.push({
+        id: i,
+        enemyAngle: postAngle,
+        enemyRadius,
+        fruitPos
+      });
+
+      const rossInstance = this.assets.instantiateRoss();
+      const enemy = new Enemy(i, postAngle, enemyRadius, rossInstance, this.scene);
+      this.enemies.push(enemy);
+    }
+
+    this.fruitManager.spawnFruitsForGuardPosts(this.guardPosts);
+    diag.live.totalFruits = total;
+  }
+
+  setState(nextState) {
+    this.state = nextState;
+    if (diag) diag.gameState = nextState;
+  }
+
+  startGame() {
+    this.audio.unlock();
+    this.resetLevelState();
+    document.getElementById('menu-screen')?.classList.add('hidden');
+    document.getElementById('pause-screen')?.classList.add('hidden');
+    document.getElementById('victory-screen')?.classList.add('hidden');
+    this.setState(GameStates.PLAYING_NIGHT);
+    this.lastFrameTime = performance.now();
+    this.canvas.focus();
+  }
+
+  resetLevelState() {
+    this.progressState.totalFruits = GameConfig.totalFruits;
+    this.progressState.collectedFruits = 0;
+    this.progressState.percentage = 0;
+    this.progressState.reachedFinalPlatform = false;
+    this.progressState.seedPlanted = false;
+    this.progressState.plantGrown = false;
+    this.progressState.jumpedBackToStart = false;
+    this.progressState.onStartPlatform = true;
+
+    this.noiseState.level = 0;
+    this.noiseState.aboveThresholdTime = 0;
+    this.noiseState.shouldTriggerDay = false;
+
+    this.cycleState.isDay = false;
+    this.cycleState.dayTimer = 0;
+    this.cycleState.dayActivationCount = 0;
+    this.cycleState.blend = 0;
+
+    this.plantGrowProgress = 0;
+    this.leftStartPlatformOnce = false;
+    this.jumpedFromFinalPlatform = false;
+
+    this.input.releaseAll();
+    this.player.reset(this.level.startCenter);
+    this.cameraController.snapToPlayer(this.player);
+
+    // Reiniciar semilla y planta
+    if (this.level.seedMesh) {
+      this.level.seedMesh.visible = true;
+      this.level.seedMesh.position.copy(this.level.seedSpawnPosition);
+    }
+    if (this.level.plantGroup) {
+      this.level.plantGroup.visible = false;
+      this.level.plantGroup.scale.set(0.001, 0.001, 0.001);
+    }
+
+    // Reiniciar frutas y enemigos
+    this.fruitManager.spawnFruitsForGuardPosts(this.guardPosts);
+    this.enemies.forEach((e) => e.resetToHome());
+
+    this.applyEnvironmentLighting(0);
+    this.updateHUD();
+  }
+
+  pauseGame() {
+    if (this.state !== GameStates.PLAYING_NIGHT && this.state !== GameStates.PLAYING_DAY) return;
+    this.previousPlayState = this.state;
+    this.input.releaseAll();
+    this.setState(GameStates.PAUSED);
+    document.getElementById('pause-screen')?.classList.remove('hidden');
+  }
+
+  resumeGame() {
+    if (this.state !== GameStates.PAUSED) return;
+    document.getElementById('pause-screen')?.classList.add('hidden');
+    this.setState(this.cycleState.isDay ? GameStates.PLAYING_DAY : GameStates.PLAYING_NIGHT);
+    this.lastFrameTime = performance.now();
+  }
+
+  togglePause() {
+    if (this.state === GameStates.PLAYING_NIGHT || this.state === GameStates.PLAYING_DAY) {
+      this.pauseGame();
+    } else if (this.state === GameStates.PAUSED) {
+      this.resumeGame();
+    }
+  }
+
+  onResize() {
+    const w = Math.max(1, window.innerWidth);
+    const h = Math.max(1, window.innerHeight);
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(w, h);
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  bindUIButtons() {
+    document.getElementById('btn-start-game')?.addEventListener('click', () => this.startGame());
+    document.getElementById('btn-pause')?.addEventListener('click', () => this.togglePause());
+    document.getElementById('btn-resume-game')?.addEventListener('click', () => this.resumeGame());
+    document.getElementById('btn-restart-from-pause')?.addEventListener('click', () => this.startGame());
+    document.getElementById('btn-restart-victory')?.addEventListener('click', () => this.startGame());
+
+    document.getElementById('btn-mute')?.addEventListener('click', (ev) => {
+      this.audio.unlock();
+      const muted = this.audio.toggleMute();
+      ev.currentTarget.textContent = muted ? 'Sonido: OFF' : 'Sonido: ON';
+    });
+
+    const openDiag = () => {
+      this.refreshDiagnosticsPanel();
+      document.getElementById('diag-screen')?.classList.remove('hidden');
+    };
+    const closeDiag = () => {
+      document.getElementById('diag-screen')?.classList.add('hidden');
+    };
+
+    document.getElementById('btn-open-diag')?.addEventListener('click', openDiag);
+    document.getElementById('btn-menu-diag')?.addEventListener('click', openDiag);
+    document.getElementById('btn-pause-diag')?.addEventListener('click', openDiag);
+    document.getElementById('btn-victory-diag')?.addEventListener('click', openDiag);
+    document.getElementById('btn-error-diag')?.addEventListener('click', openDiag);
+    document.getElementById('btn-close-diag')?.addEventListener('click', closeDiag);
+    document.getElementById('btn-refresh-diag')?.addEventListener('click', () => this.refreshDiagnosticsPanel());
+
+    // Carga de modelos GLB locales
+    document.getElementById('input-local-bomb')?.addEventListener('change', async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      await this.assets.loadLocalFile('bomb', file);
+      if (this.player) {
+        this.player.replaceModel(this.assets.instantiateBomb());
+      }
+      this.updateAssetStatusUI();
+    });
+
+    document.getElementById('input-local-ross')?.addEventListener('change', async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      await this.assets.loadLocalFile('ross', file);
+      this.buildEntities();
+      this.updateAssetStatusUI();
+    });
+  }
+
+  updateAssetStatusUI() {
+    const threeEl = document.getElementById('status-three-text');
+    const bombEl = document.getElementById('status-bomb-text');
+    const rossEl = document.getElementById('status-ross-text');
+
+    if (threeEl) {
+      threeEl.textContent = `Three.js r${THREE.REVISION} · WebGL OK · ACES`;
+      threeEl.className = 'badge-ok';
+    }
+    if (bombEl) {
+      const b = diag.models.bomb;
+      const mapOk = (b.error == null) ? ' · textura OK' : '';
+      bombEl.textContent = `${b.status} (${b.meshes} mesh${mapOk} · ${b.proceduralClips.length} clips proc.)`;
+      bombEl.className = b.status.includes('LOADED') ? 'badge-ok' : 'badge-warn';
+    }
+    if (rossEl) {
+      const r = diag.models.ross;
+      const note = (r.bones > 0) ? `${r.skinnedMeshes} skinned, ${r.bones} huesos, mapeo procedural activo` : `${r.skinnedMeshes} skinned`;
+      rossEl.textContent = `${r.status} (${note})`;
+      rossEl.className = r.status.includes('LOADED') ? 'badge-ok' : 'badge-warn';
+    }
+  }
+
+  refreshDiagnosticsPanel() {
+    const pre = document.getElementById('diag-pre');
+    if (!pre || !diag) return;
+    pre.textContent = JSON.stringify(diag.getSnapshot(), null, 2);
+  }
+
+  applyEnvironmentLighting(dayBlend) {
+    this.scene.background.lerpColors(this.nightBgColor, this.dayBgColor, dayBlend);
+    this.scene.fog.color.copy(this.scene.background);
+    this.scene.fog.density = THREE.MathUtils.lerp(0.012, 0.0045, dayBlend);
+    this.ambientLight.intensity = THREE.MathUtils.lerp(0.48, 1.35, dayBlend);
+    this.dirLight.intensity = THREE.MathUtils.lerp(0.55, 1.65, dayBlend);
+  }
+
+  /* =======================================================================
+     PASOS DEL BUCLE DE SIMULACIÓN EN TIEMPO REAL
+     ======================================================================= */
+  stepSimulation(rawDt) {
+    if (this.state !== GameStates.PLAYING_NIGHT && this.state !== GameStates.PLAYING_DAY) {
+      return;
+    }
+
+    const dt = GameRules.clampDelta(rawDt);
+    if (dt <= 0) return;
+    this.elapsed += dt;
+
+    // 1. Leer entradas
+    const input = this.input.readFrameInput();
+    const p = this.player;
+
+    // 2. Actualizar acciones y bloqueos temporales (EatContact o HitStagger)
+    if (p.staggerTimer > 0) {
+      p.staggerTimer = Math.max(0, p.staggerTimer - dt);
+    }
+
+    const isEatingCutscene = (p.eatingTarget !== null);
+    let moveForward = isEatingCutscene ? 0 : input.moveForward;
+    let turnInput = isEatingCutscene ? 0 : input.turnInput;
+    let rolling = (!isEatingCutscene && input.rolling && Math.abs(moveForward) > 0.05);
+    let sucking = (!isEatingCutscene && input.sucking);
+
+    // 3. Actualizar físicas y movimiento de Bomb
+    if (Math.abs(turnInput) > 0.01) {
+      p.heading += turnInput * 2.55 * dt;
+    }
+
+    const targetSpeed = rolling ? GameConfig.player.rollSpeed : GameConfig.player.walkSpeed;
+    const forwardX = Math.sin(p.heading);
+    const forwardZ = Math.cos(p.heading);
+
+    const desiredVx = forwardX * moveForward * targetSpeed;
+    const desiredVz = forwardZ * moveForward * targetSpeed;
+    const accel = (Math.abs(moveForward) > 0.05 ? GameConfig.player.acceleration : GameConfig.player.deceleration) * dt;
+
+    p.velocity.x = p.velocity.x + Math.sign(desiredVx - p.velocity.x) * Math.min(Math.abs(desiredVx - p.velocity.x), accel);
+    p.velocity.z = p.velocity.z + Math.sign(desiredVz - p.velocity.z) * Math.min(Math.abs(desiredVz - p.velocity.z), accel);
+
+    // Salto
+    let jumpJustHappened = false;
+    if (!isEatingCutscene && input.jumpTriggered && p.onGround) {
+      const onFinal = this.level.isOnFinalPlatform(p.position.x, p.position.z);
+      p.velocity.y = onFinal ? GameConfig.player.jumpVelocity * 1.12 : GameConfig.player.jumpVelocity;
+      if (onFinal && moveForward > 0.05) {
+        p.velocity.x = forwardX * Math.max(targetSpeed, 16.5);
+        p.velocity.z = forwardZ * Math.max(targetSpeed, 16.5);
+      }
+      p.onGround = false;
+      jumpJustHappened = true;
+      this.audio.playJump();
+      this.particles.spawnBurst(p.position, 6, 0xc4b5fd, 2.6, 8.0, 0.3);
+      if (onFinal) {
+        this.jumpedFromFinalPlatform = true;
+      }
+    }
+
+    if (!p.onGround) {
+      p.velocity.y -= GameConfig.player.gravity * dt;
+    }
+
+    const nextX = p.position.x + p.velocity.x * dt;
+    const nextZ = p.position.z + p.velocity.z * dt;
+    p.position.y += p.velocity.y * dt;
+
+    // 4. Resolver colisiones geométricas (agua central, borde exterior, plataformas y vacío)
+    const supportedAtNext = this.level.isPositionSupported(nextX, nextZ);
+    if (supportedAtNext || !p.onGround) {
+      // Mientras salta puede cruzar sobre el vacío entre plataforma final e inicial;
+      // pero nunca puede caminar dentro del agua central
+      const nextR = Math.hypot(nextX, nextZ);
+      if (nextR < GameConfig.ring.innerRadius + GameConfig.player.radius &&
+          !this.level.isOnStartPlatform(nextX, nextZ) &&
+          !this.level.isOnFinalPlatform(nextX, nextZ)) {
+        const pushR = GameConfig.ring.innerRadius + GameConfig.player.radius;
+        const ang = Math.atan2(nextZ, nextX);
+        p.position.x = Math.cos(ang) * pushR;
+        p.position.z = Math.sin(ang) * pushR;
+      } else if (nextR > GameConfig.ring.outerRadius - GameConfig.player.radius &&
+                 !this.level.isOnStartPlatform(nextX, nextZ) &&
+                 !this.level.isOnFinalPlatform(nextX, nextZ)) {
+        const clampR = GameConfig.ring.outerRadius - GameConfig.player.radius;
+        const ang = Math.atan2(nextZ, nextX);
+        p.position.x = Math.cos(ang) * clampR;
+        p.position.z = Math.sin(ang) * clampR;
+      } else {
+        p.position.x = nextX;
+        p.position.z = nextZ;
+      }
+    } else {
+      // Si intenta caminar hacia el vacío sin saltar, se detiene en el borde
+      p.velocity.x = 0;
+      p.velocity.z = 0;
+    }
+
+    // 5. Actualizar salto / aterrizaje y rescate seguro si cae al vacío
+    const groundY = this.level.getGroundHeightAt(p.position.x, p.position.z, this.progressState.plantGrown);
+    if (groundY > -50) {
+      if (p.position.y <= groundY) {
+        const wasAirborne = !p.onGround && p.velocity.y < -2.0;
+        p.position.y = groundY;
+        p.velocity.y = 0;
+        p.onGround = true;
+        if (wasAirborne) {
+          p.landingTimer = 0.2;
+          this.particles.spawnBurst(p.position, 7, 0xa855f7, 2.5, 9.0, 0.28);
+        }
+      }
+    } else if (p.position.y < -8.0) {
+      // Si cayó al vacío por quedarse corto en el salto, reubicar en la plataforma final sin perder progreso
+      p.position.copy(this.level.finalCenter);
+      p.position.y = 0;
+      p.velocity.set(0, 0, 0);
+      p.onGround = true;
+    }
+
+    if (p.landingTimer > 0) p.landingTimer = Math.max(0, p.landingTimer - dt);
+
+    // Seguimiento de recorrido: salida de plataforma inicial, llegada a final y salto de regreso
+    const onStartNow = this.level.isOnStartPlatform(p.position.x, p.position.z);
+    const onFinalNow = this.level.isOnFinalPlatform(p.position.x, p.position.z);
+    if (!onStartNow) this.leftStartPlatformOnce = true;
+    if (onFinalNow) this.progressState.reachedFinalPlatform = true;
+    if (onStartNow && this.leftStartPlatformOnce && this.jumpedFromFinalPlatform && this.progressState.plantGrown) {
+      this.progressState.jumpedBackToStart = true;
+    }
+    this.progressState.onStartPlatform = onStartNow;
+
+    // 6. Actualizar succión a distancia y comer por contacto (mini-cutscene)
+    let eatContactJustTriggered = false;
+    this.updateFeedingMechanics(dt, sucking, (triggeredContact) => {
+      if (triggeredContact) eatContactJustTriggered = true;
+    });
+
+    // Interacción con semilla y pote en la plataforma final
+    this.updateSeedAndPot(dt, input.interactTriggered);
+
+    // 7. Actualizar medidor de ruido
+    const planarSpeed = Math.hypot(p.velocity.x, p.velocity.z);
+    const moving = planarSpeed > 0.45 && p.onGround;
+    if (rolling && Math.random() < 0.25) this.audio.playRoll();
+
+    GameRules.stepNoiseMeter(this.noiseState, {
+      jumpTriggered: jumpJustHappened,
+      eatContactTriggered: eatContactJustTriggered,
+      sucking,
+      rolling,
+      moving
+    }, dt);
+
+    // 8. Comprobar transiciones Día / Noche provocadas por ruido acumulado
+    const cycleEvents = GameRules.stepDayNightCycle(this.cycleState, this.noiseState, dt);
+    if (cycleEvents.transitionedToDay) {
+      this.setState(GameStates.PLAYING_DAY);
+      this.audio.playDayAlert();
+      this.enemies.forEach((e) => e.triggerDayWake());
+    } else if (cycleEvents.transitionedToNight) {
+      this.setState(GameStates.PLAYING_NIGHT);
+      this.audio.playNightReturn();
+      this.enemies.forEach((e) => e.triggerNightReturn());
+    }
+
+    const targetBlend = this.cycleState.isDay ? 1 : 0;
+    this.cycleState.blend = THREE.MathUtils.lerp(this.cycleState.blend, targetBlend, Math.min(1, dt * 3.2));
+    this.applyEnvironmentLighting(this.cycleState.blend);
+
+    // 9. Actualizar IA y navegación de Ross + reacción temporal por colisión
+    let activeChasers = 0;
+    for (const enemy of this.enemies) {
+      enemy.update(dt, p.position);
+      // Tinte de camuflaje interpolado suavemente con el ciclo día/noche
+      enemy._applyTint(this.cycleState.blend);
+      if (enemy.state === EnemyStates.SWARM_CHASE) {
+        activeChasers++;
+        const d = enemy.position.distanceTo(p.position);
+        if (d < GameConfig.enemies.hitRadius && p.staggerTimer <= 0) {
+          p.staggerTimer = GameConfig.player.staggerDuration;
+          // Empujón temporal sin borrar progreso ni matar al jugador
+          const pushDir = new THREE.Vector3().subVectors(p.position, enemy.position).setY(0).normalize();
+          p.velocity.x = pushDir.x * 9.0;
+          p.velocity.z = pushDir.z * 9.0;
+        }
+      }
+    }
+
+    // 10. Actualizar estado de animación de Bomb, mixers y animaciones procedurales
+    this.updatePlayerAnimationState(dt, planarSpeed, rolling, sucking);
+    p.syncTransform();
+    this.playerLight.position.set(p.position.x, p.position.y + 3.2, p.position.z);
+
+    // 11. Actualizar entorno y frutas
+    this.level.update(dt, this.elapsed, this.cycleState.isDay);
+    this.fruitManager.update(dt, this.elapsed, this.cycleState.isDay);
+
+    // 12. Actualizar cámara y partículas
+    this.cameraController.update(dt, p);
+    this.particles.update(dt);
+
+    // 13. Comprobar condición de victoria
+    if (GameRules.canTriggerVictory(this.progressState)) {
+      this.triggerVictory();
+    }
+
+    // Actualizar diagnóstico en vivo e interfaz
+    if (diag && diag.live) {
+      diag.live.collectedFruits = this.progressState.collectedFruits;
+      diag.live.percentage = Math.round(this.progressState.percentage);
+      diag.live.noiseLevel = Number(this.noiseState.level.toFixed(1));
+      diag.live.isDay = this.cycleState.isDay;
+      diag.live.dayBlend = Number(this.cycleState.blend.toFixed(3));
+      diag.live.seedPlanted = this.progressState.seedPlanted;
+      diag.live.plantGrown = this.progressState.plantGrown;
+      diag.live.activeChasers = activeChasers;
+      diag.live.fps = this._lastFps ? Number(this._lastFps.toFixed(1)) : 0;
+      // Resumen de camuflaje del primer enemigo (representativo)
+      const e0 = this.enemies[0];
+      if (e0) {
+        diag.live.enemyState = e0.state;
+        diag.live.tintNight = e0._tintApplied != null ? Number(e0._tintApplied.toFixed(3)) : null;
+        diag.runtime.limbSummary = e0.animator ? {
+          state: e0.animator.currentState,
+          bonesFound: Object.keys(e0.animator.bones).length,
+          restPoseCaptured: e0.animator.restPose.size,
+          limbsMapped: Object.fromEntries(Object.entries(e0.animator.limbs || {}).map(([k,v]) => [k, v ? v.name : null]))
+        } : null;
+      }
+      diag.runtime.rendererInfo = {
+        outputColorSpace: this.renderer.outputColorSpace,
+        toneMapping: this.renderer.toneMapping,
+        toneMappingExposure: this.renderer.toneMappingExposure,
+        shadowMapEnabled: this.renderer.shadowMap.enabled,
+        triangles: this.renderer.info.render.triangles,
+        drawCalls: this.renderer.info.render.calls,
+        geometries: this.renderer.info.memory.geometries,
+        textures: this.renderer.info.memory.textures
+      };
+    }
+    this.updateHUD();
+  }
+
+  updateFeedingMechanics(dt, sucking, onContactTriggered) {
+    const p = this.player;
+
+    // A) Si está en mini-cutscene de comer por contacto
+    if (p.eatingTarget) {
+      const f = p.eatingTarget;
+      p.eatTimer += dt;
+      p.biteSoundAccum += dt;
+      if (p.biteSoundAccum >= 0.24) {
+        p.biteSoundAccum = 0;
+        this.audio.playBite();
+        // Salpicaduras de jugo morado por todas partes
+        this.particles.spawnBurst(f.mesh.position, 9, 0xa855f7, 4.8, 12.0, 0.45);
+      }
+      if (p.eatTimer >= GameConfig.player.eatContactDuration) {
+        GameRules.completeFruitCollection(f.record, this.progressState);
+        this.particles.spawnBurst(f.mesh.position, 14, 0xc084fc, 5.5, 11.0, 0.5);
+        p.eatingTarget = null;
+        p.eatTimer = 0;
+      }
+      p.suctionCone.visible = false;
+      return;
+    }
+
+    // B) Comprobar colisión directa por contacto con fruta AVAILABLE (cuando no está aspirándola)
+    for (const f of this.fruitManager.fruits) {
+      if (f.record.state !== FruitStates.AVAILABLE) continue;
+      const dist = Math.hypot(f.mesh.position.x - p.position.x, f.mesh.position.z - p.position.z);
+      const dy = Math.abs(f.mesh.position.y - p.position.y);
+      if (dist <= 1.55 && dy <= 1.8 && !sucking) {
+        if (GameRules.beginEatContactFruit(f.record)) {
+          p.eatingTarget = f;
+          p.eatTimer = 0;
+          p.biteSoundAccum = 0.24;
+          p.velocity.set(0, 0, 0);
+          onContactTriggered(true);
+          return;
+        }
+      }
+    }
+
+    // C) Succión a distancia (tipo Vacpack / Kirby)
+    if (sucking) {
+      p.suctionCone.visible = true;
+      p.suctionCone.rotation.z += dt * 9.0;
+      if (Math.random() < 0.35) this.audio.playSuck();
+
+      if (!p.suckingTarget || p.suckingTarget.record.state !== FruitStates.SUCKING) {
+        p.suckingTarget = this.findNearestSuckableFruit();
+        if (p.suckingTarget) {
+          GameRules.beginSuckFruit(p.suckingTarget.record);
+        }
+      }
+
+      if (p.suckingTarget) {
+        const target = p.suckingTarget;
+        this.particles.spawnSuctionStream(target.mesh.position, p.position);
+        const toPlayer = new THREE.Vector3(
+          p.position.x - target.mesh.position.x,
+          (p.position.y + 0.8) - target.mesh.position.y,
+          p.position.z - target.mesh.position.z
+        );
+        const dist = toPlayer.length();
+        if (dist <= 1.15) {
+          GameRules.completeFruitCollection(target.record, this.progressState);
+          this.particles.spawnBurst(p.position, 10, 0xd8b4fe, 3.8, 9.0, 0.38);
+          p.suckingTarget = null;
+        } else {
+          toPlayer.normalize();
+          target.mesh.position.addScaledVector(toPlayer, GameConfig.player.suckPullSpeed * dt);
+          target.record.x = target.mesh.position.x;
+          target.record.y = target.mesh.position.y;
+          target.record.z = target.mesh.position.z;
+        }
+      }
+    } else {
+      p.suctionCone.visible = false;
+      if (p.suckingTarget) {
+        GameRules.abortSuckFruit(p.suckingTarget.record);
+        p.suckingTarget.mesh.position.copy(p.suckingTarget.origin);
+        p.suckingTarget.record.x = p.suckingTarget.origin.x;
+        p.suckingTarget.record.y = p.suckingTarget.origin.y;
+        p.suckingTarget.record.z = p.suckingTarget.origin.z;
+        p.suckingTarget = null;
+      }
+    }
+  }
+
+  findNearestSuckableFruit() {
+    const p = this.player;
+    const forward = new THREE.Vector3(Math.sin(p.heading), 0, Math.cos(p.heading));
+    let best = null;
+    let bestDist = GameConfig.player.suckRange;
+
+    for (const f of this.fruitManager.fruits) {
+      if (f.record.state !== FruitStates.AVAILABLE) continue;
+      const toFruit = new THREE.Vector3(
+        f.mesh.position.x - p.position.x,
+        0,
+        f.mesh.position.z - p.position.z
+      );
+      const dist = toFruit.length();
+      if (dist > bestDist || dist < 0.001) continue;
+      toFruit.divideScalar(dist);
+      const dot = forward.dot(toFruit);
+      if (dot >= GameConfig.player.suckConeCos || dist < 3.2) {
+        best = f;
+        bestDist = dist;
+      }
+    }
+    return best;
+  }
+
+  updateSeedAndPot(dt, interactTriggered) {
+    const p = this.player;
+    const seed = this.level.seedMesh;
+    const potPos = this.level.potPosition;
+
+    if (!this.progressState.seedPlanted && seed) {
+      const distToSeed = Math.hypot(p.position.x - seed.position.x, p.position.z - seed.position.z);
+      if (!p.carryingSeed) {
+        if (distToSeed < 2.2 || (interactTriggered && distToSeed < 5.0)) {
+          p.carryingSeed = true;
+          seed.position.set(
+            p.position.x + Math.sin(p.heading) * 1.1,
+            p.position.y + 1.35,
+            p.position.z + Math.cos(p.heading) * 1.1
+          );
+        }
+      } else {
+        seed.position.set(
+          p.position.x + Math.sin(p.heading) * 1.1,
+          p.position.y + 1.35,
+          p.position.z + Math.cos(p.heading) * 1.1
+        );
+        const distToPot = Math.hypot(p.position.x - potPos.x, p.position.z - potPos.z);
+        if (distToPot < 2.6 || (interactTriggered && distToPot < 5.5)) {
+          p.carryingSeed = false;
+          this.progressState.seedPlanted = true;
+          seed.position.set(potPos.x, 1.25, potPos.z);
+          seed.visible = false;
+          this.level.plantGroup.visible = true;
+          this.audio.playPlant();
+          this.particles.spawnBurst(potPos, 14, 0x4ade80, 4.2, 8.0, 0.5);
+        }
+      }
+    }
+
+    if (this.progressState.seedPlanted && !this.progressState.plantGrown) {
+      this.plantGrowProgress = Math.min(1, this.plantGrowProgress + dt * 1.8);
+      const s = Math.max(0.01, this.plantGrowProgress);
+      this.level.plantGroup.scale.set(s, s, s);
+      if (this.plantGrowProgress >= 1) {
+        this.progressState.plantGrown = true;
+      }
+    }
+  }
+
+  updatePlayerAnimationState(dt, planarSpeed, rolling, sucking) {
+    const p = this.player;
+    let nextAnim = 'Idle';
+
+    if (this.state === GameStates.VICTORY) {
+      nextAnim = 'Victory';
+    } else if (p.eatingTarget) {
+      nextAnim = 'EatContact';
+    } else if (p.staggerTimer > 0) {
+      nextAnim = 'HitStagger';
+    } else if (sucking) {
+      nextAnim = 'Suck';
+    } else if (!p.onGround) {
+      nextAnim = p.velocity.y >= 0 ? 'JumpAscending' : 'JumpFalling';
+    } else if (p.landingTimer > 0) {
+      nextAnim = 'Landing';
+    } else if (rolling) {
+      nextAnim = 'Roll';
+    } else if (planarSpeed > 0.45) {
+      nextAnim = 'Locomotion';
+    }
+
+    p.animator.setState(nextAnim);
+    p.animator.update(dt, planarSpeed / GameConfig.player.walkSpeed);
+  }
+
+  triggerVictory() {
+    if (this.state === GameStates.VICTORY) return;
+    this.setState(GameStates.VICTORY);
+    this.input.releaseAll();
+    this.player.velocity.set(0, 0, 0);
+    this.player.animator.setState('Victory');
+    this.audio.playVictory();
+    document.getElementById('victory-screen')?.classList.remove('hidden');
+  }
+
+  updateHUD() {
+    const pct = Math.round(this.progressState.percentage);
+    const pctEl = document.getElementById('fruit-percentage-text');
+    const countEl = document.getElementById('fruit-count-detail');
+    if (pctEl) pctEl.textContent = `${pct} %`;
+    if (countEl) countEl.textContent = `(${this.progressState.collectedFruits}/${this.progressState.totalFruits})`;
+
+    const noiseVal = Math.round(this.noiseState.level);
+    const noiseFill = document.getElementById('noise-bar-fill');
+    const noiseText = document.getElementById('noise-value-text');
+    if (noiseFill) noiseFill.style.width = `${noiseVal}%`;
+    if (noiseText) {
+      let label = 'Silencio';
+      if (noiseVal >= GameConfig.noise.dayTriggerThreshold) label = '¡ALERTA DIURNA!';
+      else if (noiseVal >= 50) label = 'Peligro cercano';
+      else if (noiseVal >= 20) label = 'Moderado';
+      noiseText.textContent = `${noiseVal} % · ${label}`;
+    }
+
+    const badge = document.getElementById('phase-badge');
+    if (badge) {
+      if (this.cycleState.isDay) {
+        badge.textContent = `DÍA · ¡PERSECUCIÓN! (${this.cycleState.dayTimer.toFixed(1)}s)`;
+        badge.classList.add('day-alert');
+      } else {
+        badge.textContent = 'NOCHE · SIGILO';
+        badge.classList.remove('day-alert');
+      }
+    }
+
+    const banner = document.getElementById('objective-banner');
+    if (banner) {
+      if (this.progressState.percentage < 100) {
+        banner.textContent = `Objetivo: Recoge todas las frutas moradas (${this.progressState.collectedFruits}/${this.progressState.totalFruits}) sin despertar al enjambre.`;
+      } else if (!this.progressState.seedPlanted) {
+        banner.textContent = '¡100 % de frutas! Ve a la plataforma final y coloca la semilla en el pote con tierra [F / SEMILLA].';
+      } else if (!this.progressState.plantGrown) {
+        banner.textContent = 'La planta está creciendo en el pote...';
+      } else {
+        banner.textContent = '¡Planta crecida! Sube a la elevación final y salta el vacío de regreso a la plataforma inicial.';
+      }
+    }
+  }
+
+  loop(now) {
+    const rawDt = (now - this.lastFrameTime) * 0.001;
+    this.lastFrameTime = now;
+
+    // FPS instantáneo suavizado (solo diagnóstico)
+    if (rawDt > 0) {
+      const inst = 1 / rawDt;
+      this._lastFps = this._lastFps ? this._lastFps + (inst - this._lastFps) * 0.08 : inst;
+    }
+
+    if (this.state === GameStates.PLAYING_NIGHT || this.state === GameStates.PLAYING_DAY) {
+      this.stepSimulation(rawDt);
+    } else if (this.state === GameStates.VICTORY && this.player) {
+      const dt = GameRules.clampDelta(rawDt);
+      this.player.animator.update(dt, 0);
+    }
+
+    this.renderer.render(this.scene, this.camera);
+    requestAnimationFrame((t) => this.loop(t));
+  }
+}
+
+/* =========================================================================
+   API MÍNIMA DE PRUEBAS (Playwright / Node)
+   Permite ejercitar los sistemas reales sin alterar las reglas de juego.
+   ========================================================================= */
+const TEST_API = (() => {
+  const readyResolvers = [];
+  const api = {
+    game: null,
+    config: GameConfig,
+    core: GameRules,
+    states: GameStates,
+    enemyStates: EnemyStates,
+    fruitStates: FruitStates,
+    ready: new Promise((res) => readyResolvers.push(res)),
+    _resolveReady() {
+      this.game = window.__BOMB_GAME__;
+      for (const r of readyResolvers) r(true);
+    },
+    snapshot() {
+      const g = this.game;
+      if (!g) return { error: 'no game' };
+      const e0 = g.enemies[0];
+      return {
+        gameState: g.state,
+        paused: g.state === GameStates.PAUSED,
+        isDay: g.cycleState.isDay,
+        dayBlend: +g.cycleState.blend.toFixed(3),
+        fps: g._lastFps ? +g._lastFps.toFixed(1) : 0,
+        toneMapping: g.renderer.toneMapping,
+        totalFruits: g.progressState.totalFruits,
+        collectedFruits: g.progressState.collectedFruits,
+        percentage: +g.progressState.percentage.toFixed(1),
+        fruitStates: g.fruitManager.fruits.map(f => f.record.state),
+        noise: +g.noiseState.level.toFixed(1),
+        activeChasers: g.enemies.filter(e => e.state === EnemyStates.SWARM_CHASE).length,
+        enemyStates: g.enemies.map(e => e.state),
+        enemyAnimState: e0 ? e0.animator.currentState : null,
+        rossBones: e0 ? Object.keys(e0.animator.bones).length : 0,
+        rossRestPose: e0 ? e0.animator.restPose.size : 0,
+        tintNight: e0 ? e0._tintApplied : null,
+        limbs: e0 ? Object.fromEntries(Object.entries(e0.animator.limbs).map(([k,v]) => [k, v ? v.name : null])) : null,
+        playerPos: { x: +g.player.position.x.toFixed(2), y: +g.player.position.y.toFixed(2), z: +g.player.position.z.toFixed(2) },
+        playerState: g.player.animator.currentState,
+        playerGrounded: g.player.onGround,
+        playerRegion: g.level.isPositionSupported(g.player.position.x, g.player.position.z) ? 'supported' : 'void',
+        seedPlanted: g.progressState.seedPlanted,
+        plantGrown: g.progressState.plantGrown
+      };
+    },
+    start() { this.game.startGame(); },
+    pause() { this.game.pauseGame(); },
+    resume() { this.game.resumeGame(); },
+    restart() { this.game.startGame(); }, // startGame reinicia el estado del nivel
+    teleport(x, z) {
+      const g = this.game;
+      const p = g.player;
+      p.position.x = Number.isFinite(x) ? x : p.position.x;
+      p.position.z = Number.isFinite(z) ? z : p.position.z;
+      const groundY = g.level.getGroundHeightAt(p.position.x, p.position.z, g.progressState.plantGrown);
+      p.position.y = (groundY > -50) ? groundY : 0;
+      p.velocity.set(0, 0, 0);
+      p.onGround = true;
+      g.cameraController.snapToPlayer(p);
+    },
+    teleportNearFruit(i, dist = 6) {
+      const g = this.game;
+      const f = g.fruitManager.fruits[i];
+      if (!f) return false;
+      const dx = f.origin.x - g.level.finalCenter.x;
+      const dz = f.origin.z - g.level.finalCenter.z;
+      const l = Math.hypot(dx, dz) || 1;
+      this.teleport(f.origin.x + (dx / l) * dist, f.origin.z + (dz / l) * dist);
+      g.player.heading = Math.atan2(f.origin.x - g.player.position.x, f.origin.z - g.player.position.z);
+      return true;
+    },
+    holdSuck(on) { this.game.input.touchActions.suck = !!on; if (on) this.game.input.keys.add('KeyE'); else this.game.input.keys.delete('KeyE'); },
+    holdForward(on) { if (on) this.game.input.keys.add('KeyW'); else this.game.input.keys.delete('KeyW'); },
+    holdTurn(on, sign = 1) { const k = sign > 0 ? 'KeyA' : 'KeyD'; if (on) this.game.input.keys.add(k); else this.game.input.keys.delete(k); },
+    pressJump() { this.game.input.justPressed.jump = true; },
+    pressInteract() { this.game.input.justPressed.interact = true; },
+    setNoise(v) {
+      this.game.noiseState.level = Math.max(0, Math.min(100, v));
+      this.game.noiseState.aboveThresholdTime = 0;
+      this.game.noiseState.shouldTriggerDay = v >= GameConfig.noise.dayTriggerThreshold;
+    },
+    forceDay(on) {
+      if (on) { this.game.noiseState.level = 100; this.game.noiseState.aboveThresholdTime = 2; this.game.noiseState.shouldTriggerDay = true; }
+      else { this.game.cycleState.isDay = false; this.game.cycleState.dayTimer = 0; this.game.noiseState.level = 0; this.game.noiseState.shouldTriggerDay = false; this.game.enemies.forEach(e => e.triggerNightReturn()); }
+    },
+    waitFor(predicateSrc, timeoutMs) {
+      const fn = (typeof predicateSrc === 'function') ? predicateSrc : eval('(' + predicateSrc + ')');
+      const t0 = Date.now();
+      return new Promise((resolve, reject) => {
+        const tick = () => {
+          let s, ok = false;
+          try { s = this.snapshot(); ok = fn(s, this); } catch (e) { return reject(new Error('predicate: ' + e.message)); }
+          if (ok) return resolve(s);
+          if (Date.now() - t0 > (timeoutMs || 8000)) return reject(new Error('waitFor timeout (' + (timeoutMs || 8000) + ' ms). Snapshot: ' + JSON.stringify(s)));
+          setTimeout(tick, 80);
+        };
+        tick();
+      });
+    },
+    async collectAllViaSystems() {
+      const g = this.game;
+      const total = g.progressState.totalFruits;
+      for (let i = 0; i < total; i++) {
+        const f = g.fruitManager.fruits[i];
+        if (f.record.state === FruitStates.COLLECTED) continue;
+        this.teleportNearFruit(i, 6);
+        this.holdSuck(true);
+        try {
+          await this.waitFor('(s) => s.fruitStates[' + i + '] === "COLLECTED"', 12000);
+        } catch (e) {
+          // Reintento: comer por contacto
+          this.holdSuck(false);
+          this.teleport(f.origin.x, f.origin.z);
+          await new Promise(r => setTimeout(r, 1300));
+        }
+        this.holdSuck(false);
+      }
+      return this.snapshot();
+    },
+    async seedFlow() {
+      const g = this.game;
+      const seed = g.level.seedMesh;
+      const pot = g.level.potPosition;
+      this.teleport(seed.position.x + 1.0, seed.position.z + 1.0);
+      for (let i = 0; i < 5 && !g.progressState.seedPlanted; i++) {
+        this.pressInteract();
+        try { await this.waitFor('(s) => s.seedPlanted === true', 1500); break; } catch (_) {}
+      }
+      this.teleport(pot.x + 1.0, pot.z + 1.0);
+      for (let i = 0; i < 5 && g.progressState.seedPlanted && !g.progressState.plantGrown; i++) {
+        await new Promise(r => setTimeout(r, 400));
+      }
+      try { await this.waitFor('(s) => s.plantGrown === true', 6000); } catch (_) {}
+      return this.snapshot();
+    },
+    async doReturnJump() {
+      const g = this.game;
+      if (!g.progressState.plantGrown) return { skipped: 'plant not grown' };
+      const L = g.level;
+      const dirI = Math.atan2(L.startCenter.x - L.finalCenter.x, L.startCenter.z - L.finalCenter.z);
+      const sinI = Math.sin(dirI), cosI = Math.cos(dirI);
+      this.teleport(L.finalCenter.x + sinI * 4, L.finalCenter.z + cosI * 4);
+      g.player.heading = dirI;
+      this.holdForward(true);
+      await new Promise(r => setTimeout(r, 1800));
+      this.pressJump();
+      try { await this.waitFor('(s) => s.playerRegion === "supported" && s.playerPos.x > 30', 5000); } catch (_) {}
+      this.holdForward(false);
+      return this.snapshot();
+    },
+    /** Informe diagnóstico para consola/Playwright. */
+    diag() { return window.__BOMB_DIAGNOSTICS__.getSnapshot(); }
+  };
+  window.__BOMB_TEST__ = api;
+  // Resolver cuando el juego termine de arrancar
+  const bootPoll = setInterval(() => {
+    if (window.__BOMB_GAME__ && window.__BOMB_GAME__.state && window.__BOMB_GAME__.state !== GameStates.LOADING) {
+      clearInterval(bootPoll);
+      api._resolveReady();
+    }
+  }, 100);
+  return api;
+})();
+
+/* Inicialización y exposición controlada para pruebas automatizadas Playwright */
+const game = new Game();
+window.__BOMB_GAME__ = game;
+game.boot().catch((err) => {
+  if (diag) {
+    diag.recordError({
+      type: 'boot.catch',
+      message: err && err.message ? err.message : String(err),
+      severity: 'fatal'
+    });
+  }
+});
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a48a918fefcd7a5c',t:'MTc5MTY4NzE0NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
